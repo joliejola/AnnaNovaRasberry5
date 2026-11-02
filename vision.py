@@ -25,9 +25,57 @@ from typing import List, Optional, Tuple
 log = logging.getLogger("anna.vision")
 
 # ----- Config uit .env ------------------------------------------------------
-VISION_ENABLED  = os.environ.get("VISION_ENABLED", "false").lower() == "true"
-SCRFD_HEF       = os.environ.get("SCRFD_HEF", "/usr/share/hailo-models/scrfd_2_5g.hef")
-FACE_ATTR_HEF   = os.environ.get("FACE_ATTR_HEF", "/usr/share/hailo-models/face_attr_resnet_v1_18.hef")
+VISION_ENABLED   = os.environ.get("VISION_ENABLED", "false").lower() == "true"
+SCRFD_HEF        = os.environ.get("SCRFD_HEF", "/usr/share/hailo-models/scrfd_2_5g.hef")
+FACE_ATTR_HEF    = os.environ.get("FACE_ATTR_HEF", "/usr/share/hailo-models/face_attr_resnet_v1_18.hef")
+FACE_ATTR_ENABLED = os.environ.get("FACE_ATTR_ENABLED", "true").lower() == "true"
+
+# CelebA-attribute indices (volgorde uit face_attr_resnet_v1_18 training):
+_ATTR_SMILING             = 31
+_ATTR_MOUTH_SLIGHTLY_OPEN = 21
+_ATTR_NARROW_EYES         = 23
+_ATTR_WEARING_HAT         = 35
+_ATTR_EYEGLASSES          = 15
+
+# Exponential-moving-average smoothing voor mood (voorkomt per-frame-flikkering)
+_mood_ema: dict = {"smile": 0.0, "mouth": 0.0, "narrow": 0.0}
+_MOOD_ALPHA = 0.3
+
+def _ema(key: str, new_val: float) -> float:
+    v = _MOOD_ALPHA * new_val + (1 - _MOOD_ALPHA) * _mood_ema.get(key, new_val)
+    _mood_ema[key] = v
+    return v
+
+def _parse_face_attrs(attrs) -> str:
+    """40-dim sigmoid output → leesbare mood-hint."""
+    try:
+        smile  = _ema("smile",  float(attrs[_ATTR_SMILING]))
+        mouth  = _ema("mouth",  float(attrs[_ATTR_MOUTH_SLIGHTLY_OPEN]))
+        narrow = _ema("narrow", float(attrs[_ATTR_NARROW_EYES]))
+    except Exception:
+        return "niet zichtbaar"
+
+    parts = []
+    if smile > 0.6:
+        parts.append("glimlacht")
+    elif smile > 0.35:
+        parts.append("licht-glimlacht")
+    if mouth > 0.5:
+        parts.append("mond iets open")
+    if narrow > 0.55:
+        parts.append("gefocust")
+
+    extras = []
+    try:
+        if float(attrs[_ATTR_WEARING_HAT]) > 0.6: extras.append("hoed")
+        if float(attrs[_ATTR_EYEGLASSES])  > 0.6: extras.append("bril")
+    except Exception:
+        pass
+
+    base = ", ".join(parts) if parts else "neutraal"
+    if extras:
+        base += " · " + ", ".join(extras)
+    return base
 
 # Spreekplek-zone in frame-coordinaten (0-1 relatief).
 # Default: centrum van beeld, 40% breed, van 20% tot 90% hoog.
@@ -126,13 +174,44 @@ def _loop() -> None:
     time.sleep(0.5)
 
     hef = HEF(str(scrfd_path))
+
+    # Face-attr HEF: optioneel. Als niet beschikbaar → mood blijft "neutraal".
+    face_attr_hef_obj = None
+    face_attr_path = Path(FACE_ATTR_HEF)
+    if FACE_ATTR_ENABLED and face_attr_path.exists():
+        try:
+            face_attr_hef_obj = HEF(str(face_attr_path))
+            log.info(f"face_attr HEF gevonden: {face_attr_path.name}")
+        except Exception as e:
+            log.warning(f"face_attr HEF niet geladen: {e}")
+
     with VDevice() as vdevice:
         cfg = vdevice.create_configure_params_from_hef(hef, interface=HailoStreamInterface.PCIe)
         network_group = vdevice.configure(hef, cfg)[0]
         input_params = InputVStreamParams.make(network_group, format_type=FormatType.FLOAT32)
         output_params = OutputVStreamParams.make(network_group, format_type=FormatType.FLOAT32)
         input_name = next(iter(input_params))
-        in_shape = hef.get_input_vstream_infos()[0].shape  # (h, w, c)
+        in_shape = hef.get_input_vstream_infos()[0].shape
+
+        # Face-attr netwerk configureren (als beschikbaar)
+        attr_ng = None
+        attr_input_params = attr_output_params = None
+        attr_input_name = None
+        attr_in_shape = None
+        if face_attr_hef_obj is not None:
+            try:
+                attr_cfg = vdevice.create_configure_params_from_hef(
+                    face_attr_hef_obj, interface=HailoStreamInterface.PCIe
+                )
+                attr_ng = vdevice.configure(face_attr_hef_obj, attr_cfg)[0]
+                attr_input_params = InputVStreamParams.make(attr_ng, format_type=FormatType.FLOAT32)
+                attr_output_params = OutputVStreamParams.make(attr_ng, format_type=FormatType.FLOAT32)
+                attr_input_name = next(iter(attr_input_params))
+                attr_in_shape = face_attr_hef_obj.get_input_vstream_infos()[0].shape
+                log.info(f"face_attr netwerk geconfigureerd, input {attr_in_shape}")
+            except Exception as e:
+                log.warning(f"face_attr config faalde: {e} — mood blijft neutraal")
+                attr_ng = None
 
         with network_group.activate(), InferVStreams(network_group, input_params, output_params) as infer:
             with _state._lock:
@@ -147,7 +226,22 @@ def _loop() -> None:
                     faces = _parse_scrfd(out, CAM_WIDTH, CAM_HEIGHT)
 
                     at_place = any(_in_speak_zone(*f) for f in faces)
-                    mood = "neutraal"  # TODO: face_attr branch wanneer HEF beschikbaar
+
+                    # Face-attr op de voorste face (die op de spreekplek, anders eerste)
+                    mood = "neutraal"
+                    if attr_ng is not None and faces:
+                        try:
+                            top = next((f for f in faces if _in_speak_zone(*f)), faces[0])
+                            attrs = _infer_face_attr(
+                                frame, top, attr_ng,
+                                attr_input_params, attr_output_params,
+                                attr_input_name, attr_in_shape,
+                            )
+                            if attrs is not None:
+                                mood = _parse_face_attrs(attrs)
+                        except Exception as e:
+                            log.debug(f"face_attr-fout: {e}")
+
                     with _state._lock:
                         _state.frame_ts = time.monotonic()
                         _state.faces = faces
@@ -161,6 +255,43 @@ def _loop() -> None:
 
     picam.stop()
     log.info("Vision-thread gestopt")
+
+
+def _infer_face_attr(frame, bbox, attr_ng, in_params, out_params, in_name, in_shape):
+    """Run face_attr op één face-crop. Returnt 40-dim array, of None bij fout."""
+    import cv2
+    import numpy as np
+    try:
+        from hailo_platform import InferVStreams  # type: ignore
+    except Exception:
+        return None
+
+    x, y, w, h = bbox
+    # bbox is in 0..1 relatieve coords; schaal naar frame-pixels
+    fh, fw = frame.shape[:2]
+    px, py = int(x * fw), int(y * fh)
+    pw, ph = max(1, int(w * fw)), max(1, int(h * fh))
+    # 20% marge rond het gezicht (CelebA-attributes hebben baard/haar context nodig)
+    m = int(max(pw, ph) * 0.2)
+    x1, y1 = max(0, px - m), max(0, py - m)
+    x2, y2 = min(fw, px + pw + m), min(fh, py + ph + m)
+    crop = frame[y1:y2, x1:x2]
+    if crop.size == 0:
+        return None
+
+    h_in, w_in, _ = in_shape
+    resized = cv2.resize(crop, (w_in, h_in))
+    tensor = (resized.astype("float32") - 127.5) / 128.0
+    tensor = np.expand_dims(tensor, axis=0)
+
+    with attr_ng.activate(), InferVStreams(attr_ng, in_params, out_params) as attr_infer:
+        out = attr_infer.infer({in_name: tensor})
+    arr = list(out.values())[0]
+    # Sigmoid als het nog logits zijn
+    arr = arr.flatten()
+    if arr.min() < 0 or arr.max() > 1.0:
+        arr = 1.0 / (1.0 + np.exp(-arr))
+    return arr[:40]
 
 
 def _camera_only_loop(Picamera2Cls) -> None:

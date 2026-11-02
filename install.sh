@@ -218,12 +218,23 @@ print("models cached")
 
 # ---------------------------------------------------------------------------
 log "9/10 — Anna-scripts + persona + webpagina's + database"
-for f in anna-nova.py nachtslaap.py vision.py respeaker_doa.py anna-sync.py anna-enroll.py; do
+for f in anna-nova.py nachtslaap.py vision.py respeaker_doa.py anna-sync.py anna-enroll.py whisper_hailo.py; do
   install -o "${ANNA_USER}" -g "${ANNA_USER}" -m 644 \
     "${SCRIPT_DIR}/${f}" "${ANNA_DIR}/${f}"
 done
 chmod +x "${ANNA_DIR}/anna-nova.py" "${ANNA_DIR}/nachtslaap.py" \
          "${ANNA_DIR}/anna-sync.py" "${ANNA_DIR}/anna-enroll.py"
+
+# edge_whisper (optioneel: Hailo-encoder voor Whisper, ~8× sneller).
+# Niet-fataal als clone faalt — WHISPER_BACKEND=cpu blijft werken.
+if [[ ! -d "${ANNA_DIR}/edge-whisper" ]]; then
+  if sudo -u "${ANNA_USER}" git clone --depth 1 \
+      https://github.com/ktomanek/edge_whisper "${ANNA_DIR}/edge-whisper" 2>/dev/null; then
+    ok "edge-whisper gecloned (zet WHISPER_BACKEND=hailo in .env om te gebruiken)"
+  else
+    warn "edge-whisper clone faalde — WHISPER_BACKEND=cpu blijft default"
+  fi
+fi
 
 # Persona (bewerk-vriendelijk — Jolanda schrijft hier Anna's kern)
 if [[ ! -f "${ANNA_DIR}/persona.md" ]]; then

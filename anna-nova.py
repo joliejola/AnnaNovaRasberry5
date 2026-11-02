@@ -33,11 +33,11 @@ from socketserver import ThreadingMixIn
 import numpy as np
 import requests
 import sounddevice as sd
-from faster_whisper import WhisperModel
 from silero_vad import load_silero_vad, get_speech_timestamps
 
 import respeaker_doa
 import vision
+import whisper_hailo
 
 # Voiceprint (optioneel). Als resemblyzer niet geïnstalleerd is, draait Anna
 # zonder herkenning — graceful fallback.
@@ -760,8 +760,9 @@ class Listener:
     def __init__(self) -> None:
         log.info("Silero VAD laden")
         self.vad = load_silero_vad()
-        log.info(f"Whisper laden ({WHISPER_MODEL_NAME}, int8)")
-        self.asr = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8")
+        backend = os.environ.get("WHISPER_BACKEND", "cpu").lower()
+        log.info(f"Whisper backend: {backend} (model={WHISPER_MODEL_NAME})")
+        self.asr = whisper_hailo.load_asr()
         self.audio_q: queue.Queue[np.ndarray] = queue.Queue()
 
     def _callback(self, indata, frames, time_info, status):
