@@ -851,6 +851,20 @@ def main() -> int:
         log.warning(f"warmup faalde (niet-fataal): {e}")
         debug_log(f"warmup faalde: {e}", "error")
 
+    # Voice-encoder warmup: eerste identificatie kost ~1-2s voor model load.
+    # Hier doen ipv in listen-flow zodat eerste gesprek niet trager wordt.
+    if _VOICE_AVAILABLE and VOICEPRINT_ENABLED:
+        try:
+            global _VOICE_ENCODER
+            if _VOICE_ENCODER is None:
+                t0 = time.monotonic()
+                _VOICE_ENCODER = VoiceEncoder()  # type: ignore[name-defined]
+                debug_log(f"stem-encoder geladen ({time.monotonic()-t0:.1f}s)", "init")
+            # Enrolled voices meteen laden zodat eerste check snel is
+            _load_known_voices()
+        except Exception as e:
+            log.warning(f"voice-encoder warmup faalde: {e}")
+
     listener = Listener()
 
     is_awake = False
