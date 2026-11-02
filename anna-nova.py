@@ -425,6 +425,7 @@ def say(text: str) -> None:
         return
     log.info(f"Anna: {text}")
     set_state("spreekt")
+    debug_log(f'spreekt: "{text[:60]}"', "speak")
     piper = subprocess.Popen(
         [PIPER_BIN, "--model", PIPER_VOICE, "--output_raw"],
         stdin=subprocess.PIPE,
@@ -660,6 +661,7 @@ def main() -> int:
 
         if answer.strip() == "[STIL]" and ALLOW_SILENCE:
             log.info("(Anna zwijgt)")
+            debug_log("Anna zwijgt", "speak")
             log_fragment("[STIL]", "anna")
             set_state("luistert")
             continue
