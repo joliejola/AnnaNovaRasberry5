@@ -112,6 +112,35 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _serve_latest_frame(self):
+        """Laatste camera-frame als JPG. Face.html polt dit elke ~200 ms voor
+        het blurred camerabeeld-op-achtergrond. Fallback: 204 No Content zodat
+        de pagina gewoon doordraait zonder beeld (zwart)."""
+        try:
+            import cv2
+            import io
+            with vision._state._lock:
+                frame = vision._state.latest_frame
+                frame = frame.copy() if frame is not None else None
+            if frame is None:
+                self.send_response(204)
+                self.end_headers()
+                return
+            bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if not ok:
+                self.send_response(500); self.end_headers(); return
+            data = buf.tobytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            log.debug(f"frame-serve-fout: {e}")
+            self.send_response(500); self.end_headers()
+
     def do_GET(self):
         if self.path == "/" or self.path == "/face":
             self.path = "/face.html"
@@ -125,6 +154,9 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
 
         if self.path == "/messages":
             return self._json(_list_messages())
+
+        if self.path == "/frame.jpg":
+            return self._serve_latest_frame()
 
         if self.path == "/photos":
             return self._json(_list_photos())
