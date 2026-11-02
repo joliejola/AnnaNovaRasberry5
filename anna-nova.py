@@ -55,7 +55,7 @@ PIPER_VOICE         = os.environ.get("PIPER_VOICE", "")
 
 ANNA_DB             = os.environ.get("ANNA_DB", str(Path.home() / "anna-nova/anna.db"))
 ALLOW_SILENCE       = os.environ.get("ALLOW_SILENCE", "true").lower() == "true"
-END_OF_TURN_SILENCE = float(os.environ.get("END_OF_TURN_SILENCE", "1.2"))
+END_OF_TURN_SILENCE = float(os.environ.get("END_OF_TURN_SILENCE", "0.9"))
 
 SPEAK_ANGLE_CENTER  = int(os.environ.get("SPEAK_ANGLE_CENTER", "0"))
 SPEAK_ANGLE_MARGIN  = int(os.environ.get("SPEAK_ANGLE_MARGIN", "30"))
@@ -64,6 +64,16 @@ STRICT_SPEAK_PLACE  = os.environ.get("STRICT_SPEAK_PLACE", "false").lower() == "
 WAKE_PHRASE         = os.environ.get("WAKE_PHRASE", "hoi anna nova")
 WAKE_ACK            = os.environ.get("WAKE_ACK", "Hm.")  # Anna's kort "ja?" bij wakker worden
 AWAKE_TIMEOUT       = float(os.environ.get("AWAKE_TIMEOUT", "60"))
+
+# Sleep-commando: wat een bezoeker (of Jolanda) kan zeggen om Anna te laten sluimeren.
+# Komma-gescheiden lijst van zinnen. Fuzzy match: substring, lowercase, zonder leestekens.
+SLEEP_PHRASES       = os.environ.get(
+    "SLEEP_PHRASES",
+    "slaap lekker,slaap zacht,welterusten,ga slapen,ga maar slapen,ga rusten,"
+    "doe een dutje,val maar in slaap,tot morgen,slaap maar,genoeg geweest,"
+    "stil nu,anna slapen"
+)
+SLEEP_ACK           = os.environ.get("SLEEP_ACK", "Mmh. Welterusten.")
 
 WEB_DIR             = os.environ.get("WEB_DIR", str(Path.home() / "anna-nova/web"))
 PHOTOS_DIR          = os.environ.get("PHOTOS_DIR", str(Path.home() / "anna-nova/photos"))
@@ -175,6 +185,19 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
         if self.path == "/debug":
             with _debug_lock:
                 return self._json(list(DEBUG_LOG))
+
+        if self.path == "/tick":
+            # Alles-in-één voor face.html: één fetch per cyclus i.p.v. drie.
+            with _state_lock:
+                s = CURRENT_STATE
+            with _debug_lock:
+                dbg = list(DEBUG_LOG)
+            return self._json({
+                "state": s,
+                "messages": _list_messages(),
+                "debug": dbg,
+                "ts": time.time(),
+            })
 
         if self.path == "/frame.jpg":
             return self._serve_latest_frame()
@@ -340,47 +363,106 @@ def build_system_prompt(vision_state: dict) -> str:
 
 
 # ----- Brein ----------------------------------------------------------------
-def think_local(user_text: str, vision_state: dict) -> str:
+_SENTENCE_END = re.compile(r"([.!?…]+)(\s|$)")
+
+def _stream_sentences(iter_lines, extract):
+    """Yield complete sentences uit een stroom chunks."""
+    buf = ""
+    for line in iter_lines:
+        if not line:
+            continue
+        try:
+            chunk = extract(line)
+        except Exception:
+            continue
+        if chunk is None:
+            break
+        if not chunk:
+            continue
+        buf += chunk
+        while True:
+            m = _SENTENCE_END.search(buf)
+            if not m:
+                break
+            end = m.end()
+            s = buf[:end].strip()
+            buf = buf[end:]
+            if s:
+                yield s
+    if buf.strip():
+        yield buf.strip()
+
+
+def think_stream(user_text: str, vision_state: dict):
+    """Yield Anna's antwoord zin-voor-zin zodra het model ze produceert.
+    Zo start TTS vóór het hele antwoord klaar is → time-to-first-audio <2s."""
+    sys_prompt = build_system_prompt(vision_state)
+
+    if BRAIN == "cloud":
+        if not MISTRAL_API_KEY:
+            raise RuntimeError("BRAIN=cloud maar MISTRAL_API_KEY leeg")
+        r = requests.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+            json={
+                "model": MISTRAL_MODEL,
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_text},
+                ],
+                "temperature": 0.8,
+                "max_tokens": 160,
+                "stream": True,
+            },
+            timeout=60,
+            stream=True,
+        )
+        r.raise_for_status()
+        def _mistral(line):
+            s = line.decode("utf-8") if isinstance(line, bytes) else line
+            if not s.startswith("data: "):
+                return ""
+            data = s[6:].strip()
+            if data == "[DONE]":
+                return None
+            try:
+                d = json.loads(data)
+                return d["choices"][0]["delta"].get("content", "")
+            except Exception:
+                return ""
+        yield from _stream_sentences(r.iter_lines(), _mistral)
+        return
+
+    # Local via Ollama
     r = requests.post(
         f"{OLLAMA_HOST}/api/chat",
         json={
             "model": OLLAMA_MODEL,
             "messages": [
-                {"role": "system", "content": build_system_prompt(vision_state)},
+                {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_text},
             ],
-            "stream": False,
+            "stream": True,
             "options": {"temperature": 0.8, "num_predict": 120},
         },
-        timeout=90,
+        timeout=120,
+        stream=True,
     )
     r.raise_for_status()
-    return r.json()["message"]["content"].strip()
+    def _ollama(line):
+        d = json.loads(line)
+        if d.get("done"):
+            return None
+        return d.get("message", {}).get("content", "")
+    yield from _stream_sentences(r.iter_lines(), _ollama)
 
-def think_cloud(user_text: str, vision_state: dict) -> str:
-    if not MISTRAL_API_KEY:
-        raise RuntimeError("BRAIN=cloud maar MISTRAL_API_KEY leeg")
-    r = requests.post(
-        "https://api.mistral.ai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
-        json={
-            "model": MISTRAL_MODEL,
-            "messages": [
-                {"role": "system", "content": build_system_prompt(vision_state)},
-                {"role": "user", "content": user_text},
-            ],
-            "temperature": 0.8,
-            "max_tokens": 160,
-        },
-        timeout=30,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
 
 def think(user_text: str, vision_state: dict) -> str:
+    """Non-streaming fallback — collect alles via think_stream."""
     try:
         t0 = time.monotonic()
-        result = (think_local if BRAIN == "local" else think_cloud)(user_text, vision_state)
+        parts = list(think_stream(user_text, vision_state))
+        result = " ".join(parts).strip()
         debug_log(f'brein ({time.monotonic()-t0:.1f}s): "{result[:60]}"', "think_end")
         return result
     except Exception as e:
@@ -416,7 +498,9 @@ def _handle_photo_tag(answer: str) -> str:
 
 
 # ----- Stem (Piper) ---------------------------------------------------------
-def say(text: str) -> None:
+def say(text: str, log_fragment_too: bool = True) -> None:
+    """Spreek één zin via Piper. Streaming-caller zet log_fragment_too=False
+    en logt het volle antwoord zelf één keer na afloop."""
     if not text or text.strip() == "[STIL]":
         log.info("(zwijgen)")
         return
@@ -440,7 +524,8 @@ def say(text: str) -> None:
     piper.stdin.close()
     aplay.wait()
     piper.wait()
-    log_fragment(text, "anna")
+    if log_fragment_too:
+        log_fragment(text, "anna")
 
 
 # ----- Wake-detectie --------------------------------------------------------
@@ -464,6 +549,55 @@ def wake_match(transcript: str, phrase: str = WAKE_PHRASE) -> bool:
     heeft_anna = "anna" in t
     heeft_nova = "nova" in t
     return heeft_anna and (heeft_nova or groet_hits)
+
+
+def sleep_match(transcript: str) -> bool:
+    """True als de bezoeker Anna vraagt te gaan slapen.
+
+    Token-based: robuuster dan pure substring-match. "Ga nu maar slapen"
+    (met woorden tussenin) matcht óók. "Ik slaap slecht" (over zichzelf)
+    matcht expliciet NIET.
+    """
+    t = _normalize(transcript)
+    tokens = set(t.split())
+
+    # 1. Alleenstaande triggers
+    if tokens & {"welterusten", "slapenstijd"}:
+        return True
+    if "tot morgen" in t or "goedenacht" in t or "goede nacht" in t:
+        return True
+
+    # 2. 'slaap' / 'slapen' + imperative context
+    if tokens & {"slaap", "slapen"}:
+        if tokens & {"ik", "ikke"}:
+            return False  # "ik slaap slecht" — niet over Anna
+        if tokens & {"ga", "maar", "lekker", "zacht", "nu", "jij", "anna", "nova", "even"}:
+            return True
+        if len(tokens) <= 2:  # "slaap!" / "slapen anna"
+            return True
+
+    # 3. Dutje
+    if "dutje" in tokens:
+        return True
+
+    # 4. Rust/rusten als imperative
+    if tokens & {"rust", "rusten"} and tokens & {"ga", "maar", "even", "nu"}:
+        return True
+
+    # 5. Afscheid (uit oude vriendin-bot: "dag", "doei")
+    if tokens & {"dag", "doei", "doeg", "tabee"}:
+        # Alleen: standalone ("Dag!") of met Anna erbij ("Dag Anna")
+        # NIET: "dag was prima" (geen afscheid)
+        if len(tokens) == 1 or tokens & {"anna", "nova", "jij"}:
+            return True
+
+    # 6. User-defined phrases als substring-fallback
+    for phrase in SLEEP_PHRASES.split(","):
+        p = _normalize(phrase)
+        if p and p in t:
+            return True
+
+    return False
 
 
 # ----- Spreekplek-check (DoA + camera) --------------------------------------
@@ -646,6 +780,18 @@ def main() -> int:
 
         last_activity = time.monotonic()
 
+        # Slaap-commando: direct opvolgen, zelfs als buiten de spreekplek —
+        # Jolanda moet Anna altijd kunnen laten slapen.
+        if sleep_match(heard):
+            log.info(f"sleep-commando: '{heard}'")
+            debug_log(f'slaap-opdracht: "{heard}"', "sleep")
+            log_fragment(heard, "visitor")
+            if SLEEP_ACK:
+                say(SLEEP_ACK)
+            is_awake = False
+            set_state("sluimert")
+            continue
+
         if not from_speak_place():
             log.info(f"gehoord maar buiten spreekplek — negeer: {heard}")
             debug_log(f'buiten spreekplek: "{heard[:40]}"', "skip")
@@ -657,23 +803,42 @@ def main() -> int:
 
         set_state("denkt")
         vs = vision.get_state()
-        answer = think(heard, vs)
 
-        if answer.strip() == "[STIL]" and ALLOW_SILENCE:
+        # STREAMING: start met spreken zodra de eerste zin klaar is.
+        t0 = time.monotonic()
+        parts: list[str] = []
+        spoke = False
+        try:
+            for sentence in think_stream(heard, vs):
+                clean = sentence.strip()
+                if not clean:
+                    continue
+                if clean.upper() == "[STIL]":
+                    continue
+                clean = _handle_photo_tag(clean)
+                if not clean:
+                    continue
+                parts.append(clean)
+                if not spoke:
+                    debug_log(f"eerste zin ({time.monotonic()-t0:.1f}s)", "think_end")
+                    spoke = True
+                say(clean, log_fragment_too=False)
+        except Exception as e:
+            log.warning(f"stream-fout: {e}")
+            debug_log(f"stream-fout: {e}", "error")
+
+        answer_full = " ".join(parts).strip()
+
+        if not answer_full and ALLOW_SILENCE:
             log.info("(Anna zwijgt)")
             debug_log("Anna zwijgt", "speak")
             log_fragment("[STIL]", "anna")
             set_state("luistert")
             continue
 
-        # [FOTO]-tag verwerken: foto nemen + tag strippen uit de uit te spreken tekst
-        answer = _handle_photo_tag(answer)
-        if not answer:
-            # Alleen [FOTO] zonder woorden — foto is al genomen, we zwijgen hoorbaar
-            set_state("luistert")
-            continue
+        if answer_full:
+            log_fragment(answer_full, "anna")
 
-        say(answer)
         set_state("luistert")
         last_activity = time.monotonic()
 

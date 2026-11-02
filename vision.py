@@ -157,7 +157,7 @@ def _loop() -> None:
                         _state.latest_frame = frame.copy()
                 except Exception as e:
                     log.debug(f"frame-fout: {e}")
-                time.sleep(0.1)
+                time.sleep(0.3)  # ~3 fps — genoeg voor "wie staat voor me"
 
     picam.stop()
     log.info("Vision-thread gestopt")
@@ -183,7 +183,7 @@ def _camera_only_loop(Picamera2Cls) -> None:
                     _state.latest_frame = frame.copy()
             except Exception as e:
                 log.debug(f"camera-only grab-fout: {e}")
-            time.sleep(0.3)
+            time.sleep(0.5)
         picam.stop()
     except Exception as e:
         log.warning(f"camera-fout: {e} — blind-aanwezig modus")

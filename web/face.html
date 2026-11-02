@@ -258,7 +258,8 @@
     img.src = url;
   }
   refreshFrame();
-  frameTimer = setInterval(refreshFrame, 400);
+  // 1 fps op het camerabeeld: Anna's ogen zijn traag, en meer kost CPU
+  frameTimer = setInterval(refreshFrame, 1000);
 
   // --- state + conversation refresh ---
   let lastVisitor = "", lastAnna = "";
@@ -270,12 +271,12 @@
 
   async function tick() {
     try {
-      const [sr, mr] = await Promise.all([
-        fetch("/state",    { cache: "no-store" }),
-        fetch("/messages", { cache: "no-store" })
-      ]);
-      const state = (await sr.json()).state;
-      const messages = await mr.json();
+      // Eén gecombineerde fetch i.p.v. drie losse: scheelt ~2/3 HTTP overhead
+      const r = await fetch("/tick", { cache: "no-store" });
+      const j = await r.json();
+      const state = j.state;
+      const messages = j.messages || [];
+      const debugItems = j.debug || [];
 
       // State badge
       const badge = document.getElementById("state-badge");
@@ -318,6 +319,19 @@
                 document.getElementById("t-anna"), null, a);
       }
 
+      // Debug-balk hergebruikt dezelfde fetch
+      if (debugItems.length) {
+        const last = debugItems[debugItems.length-1];
+        const key = last.ts + "|" + last.msg;
+        if (key !== lastDebugTs) {
+          lastDebugTs = key;
+          const bar = document.getElementById("debug-bar");
+          bar.innerHTML = debugItems.slice(-4).map(e =>
+            `<div class="line ${e.kind}"><span class="ts">${e.ts}</span>${escapeHtml(e.msg)}</div>`
+          ).join("");
+        }
+      }
+
     } catch (e) {
       const badge = document.getElementById("state-badge");
       STATES.forEach(x => badge.classList.remove("state-" + x));
@@ -325,30 +339,11 @@
       document.getElementById("state-text").textContent = "offline";
     }
   }
-  tick();
-  setInterval(tick, 800);
-
-  // --- debug feed ---
   let lastDebugTs = "";
-  async function debugTick() {
-    try {
-      const r = await fetch("/debug", { cache: "no-store" });
-      const items = await r.json();
-      if (!items.length) return;
-      const last = items[items.length-1];
-      const key = last.ts + "|" + last.msg;
-      if (key === lastDebugTs) return;
-      lastDebugTs = key;
-      const bar = document.getElementById("debug-bar");
-      // Laatste 4 regels, nieuwste onderaan
-      bar.innerHTML = items.slice(-4).map(e =>
-        `<div class="line ${e.kind}"><span class="ts">${e.ts}</span>${escapeHtml(e.msg)}</div>`
-      ).join("");
-    } catch (e) {}
-  }
   function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
-  debugTick();
-  setInterval(debugTick, 700);
+  tick();
+  // Eén gecombineerde cyclus — state+messages+debug tegelijk
+  setInterval(tick, 1000);
 </script>
 </body>
 </html>
