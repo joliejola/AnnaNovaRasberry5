@@ -509,6 +509,18 @@ def main() -> int:
     _start_http_server()
     time.sleep(1.0)
 
+    # Warmup: de system-prompt is lang (persona.md ~4000 tokens). Zonder dit
+    # duurt de eerste échte beurt op lokaal Phi-3 ~20-30s omdat de hele prompt
+    # dan pas door de CPU-tokenizer gaat. Eén dummy-call zet de KV-cache
+    # warm, daarna zijn volgende beurten snel.
+    try:
+        log.info("brein-warmup — eerste prompt opbouwen (dit duurt even)")
+        t0 = time.monotonic()
+        _ = think("hallo", vision.get_state())
+        log.info(f"warmup klaar in {time.monotonic()-t0:.1f}s")
+    except Exception as e:
+        log.warning(f"warmup faalde (niet-fataal): {e}")
+
     listener = Listener()
 
     is_awake = False
