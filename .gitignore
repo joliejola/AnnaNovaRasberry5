@@ -1,0 +1,22 @@
+# De lokaal gegenereerde config (met eventuele API-keys)
+.env
+
+# Lokale opslag van Anna's foto's / database — nooit committen
+photos/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Lokaal gedownloade modellen (worden door installer gehaald)
+piper/
+models/*.hef
+
+# venv
+venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

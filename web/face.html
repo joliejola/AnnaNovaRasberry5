@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anna Nova</title>
+<style>
+  :root {
+    --bg: #0a0908;
+    --amber: #f4b860;
+    --amber-dim: #4a3617;
+    --paper: #e8e3d8;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--paper);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    overflow: hidden;
+    cursor: none;
+  }
+  .scene {
+    position: fixed; inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4rem;
+  }
+  .orb {
+    width: 42vmin; height: 42vmin;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%,
+      var(--amber) 0%,
+      var(--amber-dim) 55%,
+      transparent 72%);
+    filter: blur(2px);
+    transition: transform 1.6s ease, filter 1.2s ease, opacity 1.6s ease;
+    will-change: transform, filter, opacity;
+    opacity: 0.85;
+  }
+  .halo {
+    position: absolute;
+    width: 70vmin; height: 70vmin;
+    border-radius: 50%;
+    border: 1px solid rgba(244, 184, 96, 0.08);
+    pointer-events: none;
+    transition: all 1.6s ease;
+  }
+  .label {
+    font-size: 0.85rem;
+    letter-spacing: 0.18em;
+    text-transform: lowercase;
+    color: rgba(232, 227, 216, 0.35);
+    transition: opacity 0.6s ease;
+  }
+
+  /* STATE: sluimert — langzaam ademen, warm maar laag */
+  body.sluimert .orb {
+    animation: breathe-slow 6s ease-in-out infinite;
+    opacity: 0.45;
+    filter: blur(6px);
+  }
+  @keyframes breathe-slow {
+    0%, 100% { transform: scale(0.82); }
+    50%      { transform: scale(0.92); }
+  }
+
+  /* STATE: luistert — iets lichter, subtiel pulseren */
+  body.luistert .orb {
+    animation: breathe-awake 2.4s ease-in-out infinite;
+    opacity: 0.9;
+    filter: blur(1px);
+  }
+  @keyframes breathe-awake {
+    0%, 100% { transform: scale(0.97); }
+    50%      { transform: scale(1.03); }
+  }
+
+  /* STATE: denkt — trilling, mijmerend */
+  body.denkt .orb {
+    animation: think 0.9s ease-in-out infinite;
+    opacity: 0.95;
+    filter: blur(0.5px) saturate(1.2);
+  }
+  @keyframes think {
+    0%, 100% { transform: scale(1.0) translate(0, 0); }
+    25%      { transform: scale(1.02) translate(0.5%, -0.3%); }
+    50%      { transform: scale(0.99) translate(-0.3%, 0.4%); }
+    75%      { transform: scale(1.01) translate(0.2%, 0.2%); }
+  }
+
+  /* STATE: spreekt — uitstralen, krachtig */
+  body.spreekt .orb {
+    animation: speak 1.2s ease-in-out infinite;
+    opacity: 1;
+    filter: blur(0px) brightness(1.15);
+  }
+  @keyframes speak {
+    0%, 100% { transform: scale(1.02); }
+    50%      { transform: scale(1.12); }
+  }
+  body.spreekt .halo {
+    animation: halo-pulse 1.2s ease-in-out infinite;
+    border-color: rgba(244, 184, 96, 0.14);
+  }
+  @keyframes halo-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50%      { transform: scale(1.05); opacity: 0.95; }
+  }
+
+  /* STATE: offline — gedimd, geen beweging */
+  body.offline .orb {
+    opacity: 0.1;
+    filter: blur(10px);
+    animation: none;
+  }
+</style>
+</head>
+<body class="sluimert">
+  <div class="scene">
+    <div class="halo"></div>
+    <div class="orb"></div>
+    <div class="label" id="label">sluimert</div>
+  </div>
+<script>
+  const label = document.getElementById("label");
+  const STATES = ["sluimert", "luistert", "denkt", "spreekt", "offline"];
+  async function tick() {
+    try {
+      const r = await fetch("/state", { cache: "no-store" });
+      const j = await r.json();
+      const s = STATES.includes(j.state) ? j.state : "sluimert";
+      if (!document.body.classList.contains(s)) {
+        STATES.forEach(x => document.body.classList.remove(x));
+        document.body.classList.add(s);
+        label.textContent = s;
+      }
+    } catch (e) {
+      if (!document.body.classList.contains("offline")) {
+        STATES.forEach(x => document.body.classList.remove(x));
+        document.body.classList.add("offline");
+        label.textContent = "offline";
+      }
+    }
+  }
+  tick();
+  setInterval(tick, 400);
+</script>
+</body>
+</html>
