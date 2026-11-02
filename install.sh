@@ -21,6 +21,18 @@ MODELS_DIR="${ANNA_DIR}/models"
 MODEL_LOCAL="phi3:mini"
 PIPER_VOICE="nl_NL-mls_7432-low"  # Jolanda's keuze — zachte MLS-stem speaker 7432
 
+# -----------------------------------------------------------------------------
+# Scherm — Waveshare 4" Square HDMI (720×720)
+# -----------------------------------------------------------------------------
+# Als je een ander scherm gebruikt, pas hier aan. SCHERM_HDMI_PORT = 1 betekent
+# de tweede HDMI-poort (HDMI-A-2) op de Pi 5, zoals Jolanda in haar oude Pi 4
+# config had staan. Zet op 0 voor de eerste poort (HDMI-A-1).
+SCHERM_WIDTH=720
+SCHERM_HEIGHT=720
+SCHERM_HDMI_PORT=1
+SCHERM_REFRESH=60
+SCHERM_BOOST=7      # 0-11 — hoger = sterker HDMI-signaal (voor lange kabels)
+
 # Hailo Model Zoo HEF-URLs voor Hailo-8L
 # Bronnen: hailo-ai/hailo_model_zoo releases.
 # Als deze URLs 404'en, controleer handmatig op:
@@ -79,6 +91,27 @@ cp -n "$CFG" "${CFG}.anna-backup"
 grep -q '^camera_auto_detect=0'   "$CFG" || echo 'camera_auto_detect=0'   >> "$CFG"
 grep -q '^dtoverlay=ov5647,cam0'  "$CFG" || echo 'dtoverlay=ov5647,cam0'  >> "$CFG"
 grep -q '^usb_max_current_enable=1' "$CFG" || echo 'usb_max_current_enable=1' >> "$CFG"
+
+# Scherm: Waveshare 4" Square HDMI
+if ! grep -q "hdmi_cvt=${SCHERM_WIDTH} ${SCHERM_HEIGHT}" "$CFG"; then
+  cat >> "$CFG" <<EOF
+
+# Anna Nova — Waveshare 4" Square HDMI (${SCHERM_WIDTH}×${SCHERM_HEIGHT})
+[HDMI:${SCHERM_HDMI_PORT}]
+hdmi_force_hotplug=1
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=${SCHERM_WIDTH} ${SCHERM_HEIGHT} ${SCHERM_REFRESH} 6 0 0 0
+hdmi_drive=2
+config_hdmi_boost=${SCHERM_BOOST}
+
+[all]
+EOF
+  ok "scherm-config toegevoegd (HDMI:${SCHERM_HDMI_PORT}, ${SCHERM_WIDTH}×${SCHERM_HEIGHT}@${SCHERM_REFRESH}Hz)"
+else
+  ok "scherm-config bestaat al"
+fi
+
 ok "config.txt bijgewerkt"
 
 if command -v rpi-eeprom-config >/dev/null; then

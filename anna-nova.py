@@ -23,6 +23,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -76,12 +77,28 @@ BLOCK_SIZE  = int(SAMPLE_RATE * BLOCK_MS / 1000)
 _state_lock = threading.Lock()
 CURRENT_STATE = "sluimert"  # sluimert | luistert | denkt | spreekt
 
+# Debug-ringbuffer — zichtbaar in /debug + onderaan het Anna-scherm.
+# Jolanda gebruikt dit om tijdens expositie-opbouw te zien wat de bot doet.
+_debug_lock = threading.Lock()
+DEBUG_LOG: deque = deque(maxlen=100)
+
+def debug_log(msg: str, kind: str = "info") -> None:
+    """Voeg een regel toe aan de debug-buffer. Verschijnt onderaan face.html."""
+    entry = {
+        "ts": datetime.now().strftime("%H:%M:%S"),
+        "kind": kind,
+        "msg": msg,
+    }
+    with _debug_lock:
+        DEBUG_LOG.append(entry)
+
 def set_state(s: str) -> None:
     global CURRENT_STATE
     with _state_lock:
         if CURRENT_STATE != s:
             CURRENT_STATE = s
             log.info(f"state → {s}")
+            debug_log(f"staat → {s}", "state")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -154,6 +171,10 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
 
         if self.path == "/messages":
             return self._json(_list_messages())
+
+        if self.path == "/debug":
+            with _debug_lock:
+                return self._json(list(DEBUG_LOG))
 
         if self.path == "/frame.jpg":
             return self._serve_latest_frame()
@@ -358,9 +379,13 @@ def think_cloud(user_text: str, vision_state: dict) -> str:
 
 def think(user_text: str, vision_state: dict) -> str:
     try:
-        return (think_local if BRAIN == "local" else think_cloud)(user_text, vision_state)
+        t0 = time.monotonic()
+        result = (think_local if BRAIN == "local" else think_cloud)(user_text, vision_state)
+        debug_log(f'brein ({time.monotonic()-t0:.1f}s): "{result[:60]}"', "think_end")
+        return result
     except Exception as e:
         log.warning(f"brein-fout: {e}")
+        debug_log(f"brein-fout: {e}", "error")
         return "[STIL]"
 
 
@@ -374,8 +399,10 @@ def _take_photo(caption: str) -> str | None:
     path = str(Path(PHOTOS_DIR) / fname)
     if not vision.save_latest_photo(path):
         log.info("fotograaf: nog geen frame beschikbaar — foto overgeslagen")
+        debug_log("foto overgeslagen (geen frame)", "photo")
         return None
     log.info(f"foto opgeslagen: {fname} — \"{caption[:60]}\"")
+    debug_log(f"foto: {fname}", "photo")
     log_fragment(f"[FOTO:{fname}] {caption}", "anna")
     return fname
 
@@ -559,6 +586,7 @@ def main() -> int:
 
     vision.start()
     _start_http_server()
+    debug_log(f"Anna wordt wakker · brein={BRAIN}", "boot")
     time.sleep(1.0)
 
     # Warmup: de system-prompt is lang (persona.md ~4000 tokens). Zonder dit
@@ -567,11 +595,14 @@ def main() -> int:
     # warm, daarna zijn volgende beurten snel.
     try:
         log.info("brein-warmup — eerste prompt opbouwen (dit duurt even)")
+        debug_log("brein-warmup (dit duurt even)...", "init")
         t0 = time.monotonic()
         _ = think("hallo", vision.get_state())
         log.info(f"warmup klaar in {time.monotonic()-t0:.1f}s")
+        debug_log(f"warmup klaar ({time.monotonic()-t0:.1f}s)", "init")
     except Exception as e:
         log.warning(f"warmup faalde (niet-fataal): {e}")
+        debug_log(f"warmup faalde: {e}", "error")
 
     listener = Listener()
 
@@ -591,6 +622,7 @@ def main() -> int:
         if not heard:
             if is_awake and (time.monotonic() - last_activity > AWAKE_TIMEOUT):
                 log.info("stilte duurt — Anna valt terug in sluimer")
+                debug_log("sluimer (stilte duurt te lang)", "sleep")
                 is_awake = False
                 set_state("sluimert")
             continue
@@ -598,6 +630,7 @@ def main() -> int:
         if not is_awake:
             if wake_match(heard):
                 log.info(f"wake: '{heard}'")
+                debug_log(f'wake: "{heard}"', "wake")
                 is_awake = True
                 last_activity = time.monotonic()
                 log_fragment(heard, "visitor")
@@ -607,15 +640,18 @@ def main() -> int:
                 set_state("luistert")
             else:
                 log.debug(f"(sluimer, niet-wake): {heard}")
+                debug_log(f'genegeerd (geen wake): "{heard[:40]}"', "skip")
             continue
 
         last_activity = time.monotonic()
 
         if not from_speak_place():
             log.info(f"gehoord maar buiten spreekplek — negeer: {heard}")
+            debug_log(f'buiten spreekplek: "{heard[:40]}"', "skip")
             continue
 
         log.info(f"Bezoeker: {heard}")
+        debug_log(f'bezoeker: "{heard}"', "visitor")
         log_fragment(heard, "visitor")
 
         set_state("denkt")
