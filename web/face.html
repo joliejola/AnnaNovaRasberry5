@@ -1,152 +1,113 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Anna Nova</title>
-<style>
-  :root {
-    --bg: #0a0908;
-    --amber: #f4b860;
-    --amber-dim: #4a3617;
-    --paper: #e8e3d8;
-  }
-  html, body {
-    margin: 0; padding: 0;
-    height: 100%;
-    background: var(--bg);
-    color: var(--paper);
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    overflow: hidden;
-    cursor: none;
-  }
-  .scene {
-    position: fixed; inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4rem;
-  }
-  .orb {
-    width: 42vmin; height: 42vmin;
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 50%,
-      var(--amber) 0%,
-      var(--amber-dim) 55%,
-      transparent 72%);
-    filter: blur(2px);
-    transition: transform 1.6s ease, filter 1.2s ease, opacity 1.6s ease;
-    will-change: transform, filter, opacity;
-    opacity: 0.85;
-  }
-  .halo {
-    position: absolute;
-    width: 70vmin; height: 70vmin;
-    border-radius: 50%;
-    border: 1px solid rgba(244, 184, 96, 0.08);
-    pointer-events: none;
-    transition: all 1.6s ease;
-  }
-  .label {
-    font-size: 0.85rem;
-    letter-spacing: 0.18em;
-    text-transform: lowercase;
-    color: rgba(232, 227, 216, 0.35);
-    transition: opacity 0.6s ease;
-  }
-
-  /* STATE: sluimert — langzaam ademen, warm maar laag */
-  body.sluimert .orb {
-    animation: breathe-slow 6s ease-in-out infinite;
-    opacity: 0.45;
-    filter: blur(6px);
-  }
-  @keyframes breathe-slow {
-    0%, 100% { transform: scale(0.82); }
-    50%      { transform: scale(0.92); }
-  }
-
-  /* STATE: luistert — iets lichter, subtiel pulseren */
-  body.luistert .orb {
-    animation: breathe-awake 2.4s ease-in-out infinite;
-    opacity: 0.9;
-    filter: blur(1px);
-  }
-  @keyframes breathe-awake {
-    0%, 100% { transform: scale(0.97); }
-    50%      { transform: scale(1.03); }
-  }
-
-  /* STATE: denkt — trilling, mijmerend */
-  body.denkt .orb {
-    animation: think 0.9s ease-in-out infinite;
-    opacity: 0.95;
-    filter: blur(0.5px) saturate(1.2);
-  }
-  @keyframes think {
-    0%, 100% { transform: scale(1.0) translate(0, 0); }
-    25%      { transform: scale(1.02) translate(0.5%, -0.3%); }
-    50%      { transform: scale(0.99) translate(-0.3%, 0.4%); }
-    75%      { transform: scale(1.01) translate(0.2%, 0.2%); }
-  }
-
-  /* STATE: spreekt — uitstralen, krachtig */
-  body.spreekt .orb {
-    animation: speak 1.2s ease-in-out infinite;
-    opacity: 1;
-    filter: blur(0px) brightness(1.15);
-  }
-  @keyframes speak {
-    0%, 100% { transform: scale(1.02); }
-    50%      { transform: scale(1.12); }
-  }
-  body.spreekt .halo {
-    animation: halo-pulse 1.2s ease-in-out infinite;
-    border-color: rgba(244, 184, 96, 0.14);
-  }
-  @keyframes halo-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50%      { transform: scale(1.05); opacity: 0.95; }
-  }
-
-  /* STATE: offline — gedimd, geen beweging */
-  body.offline .orb {
-    opacity: 0.1;
-    filter: blur(10px);
-    animation: none;
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anna Nova 💫</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 50px auto; padding: 0 1em; color: #333; }
+    h2 { color: #333; font-weight: normal; }
+    #chatbox {
+      border: 1px solid #ccc;
+      padding: 1em;
+      height: 400px;
+      overflow-y: auto;
+      background: #f9f9f9;
+      margin-bottom: 10px;
+      border-radius: 4px;
+    }
+    #chatbox p { margin: 0.4em 0; line-height: 1.5; }
+    #chatbox strong { color: #666; }
+    .msg-anna strong { color: #c67e3e; }
+    .msg-anna {
+      background: #fdf7ec;
+      padding: 0.5em 0.8em;
+      border-radius: 6px;
+      margin: 0.6em 0 !important;
+    }
+    .empty { color: #aaa; text-align: center; margin-top: 3em; font-style: italic; }
+    #state {
+      font-size: 0.9em;
+      color: #888;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50%      { opacity: 1; }
+    }
+    .state-sluimert { color: #999; }
+    .state-luistert { color: #2a7a52; }
+    .state-denkt    { color: #c67e3e; }
+    .state-spreekt  { color: #d85a30; font-weight: 500; }
+    .state-offline  { color: #c33; }
+  </style>
 </head>
-<body class="sluimert">
-  <div class="scene">
-    <div class="halo"></div>
-    <div class="orb"></div>
-    <div class="label" id="label">sluimert</div>
+<body>
+  <h2>Chat met Anna Nova 💫</h2>
+  <div id="chatbox"><p class="empty">(nog niets gezegd)</p></div>
+  <div id="state" class="state-sluimert">
+    <span class="pulse-dot"></span><span id="state-text">sluimert</span>
   </div>
+
 <script>
-  const label = document.getElementById("label");
   const STATES = ["sluimert", "luistert", "denkt", "spreekt", "offline"];
+  let lastCount = -1;
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  }
+
   async function tick() {
     try {
-      const r = await fetch("/state", { cache: "no-store" });
-      const j = await r.json();
-      const s = STATES.includes(j.state) ? j.state : "sluimert";
-      if (!document.body.classList.contains(s)) {
-        STATES.forEach(x => document.body.classList.remove(x));
-        document.body.classList.add(s);
-        label.textContent = s;
+      const [sr, mr] = await Promise.all([
+        fetch("/state",    { cache: "no-store" }),
+        fetch("/messages", { cache: "no-store" })
+      ]);
+      const state = (await sr.json()).state;
+      const messages = await mr.json();
+
+      const stateEl = document.getElementById("state");
+      const stateTxt = document.getElementById("state-text");
+      const s = STATES.includes(state) ? state : "sluimert";
+      STATES.forEach(x => stateEl.classList.remove("state-" + x));
+      stateEl.classList.add("state-" + s);
+      stateTxt.textContent = s;
+
+      if (messages.length !== lastCount) {
+        lastCount = messages.length;
+        const box = document.getElementById("chatbox");
+        if (messages.length === 0) {
+          box.innerHTML = '<p class="empty">(nog niets gezegd)</p>';
+        } else {
+          box.innerHTML = messages.map(m => {
+            const sender = m.kind === "anna" ? "Anna Nova" : "Jij";
+            const cls = m.kind === "anna" ? "msg-anna" : "";
+            return `<p class="${cls}"><strong>${sender}:</strong> ${escapeHtml(m.text)}</p>`;
+          }).join("");
+          box.scrollTop = box.scrollHeight;
+        }
       }
     } catch (e) {
-      if (!document.body.classList.contains("offline")) {
-        STATES.forEach(x => document.body.classList.remove(x));
-        document.body.classList.add("offline");
-        label.textContent = "offline";
-      }
+      const stateEl = document.getElementById("state");
+      STATES.forEach(x => stateEl.classList.remove("state-" + x));
+      stateEl.classList.add("state-offline");
+      document.getElementById("state-text").textContent = "offline";
     }
   }
+
   tick();
-  setInterval(tick, 400);
+  setInterval(tick, 1200);
 </script>
 </body>
 </html>

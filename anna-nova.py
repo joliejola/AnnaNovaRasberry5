@@ -123,6 +123,9 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
                 s = CURRENT_STATE
             return self._json({"state": s, "ts": time.time()})
 
+        if self.path == "/messages":
+            return self._json(_list_messages())
+
         if self.path == "/photos":
             return self._json(_list_photos())
 
@@ -145,6 +148,23 @@ class _AnnaHandler(SimpleHTTPRequestHandler):
 class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+
+def _list_messages():
+    """Laatste ~50 fragments uit SQLite voor het chat-scherm.
+    Filter: geen [STIL], geen [FOTO:...] (die zijn fotomoments, niet gespreksregels)."""
+    try:
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT ts, text, kind FROM fragments "
+                "WHERE text != '[STIL]' "
+                "AND text NOT LIKE '[FOTO:%' "
+                "ORDER BY ts DESC LIMIT 50"
+            ).fetchall()
+    except Exception:
+        return []
+    # Chronologisch (oud eerst) voor chat-weergave
+    return [{"ts": ts, "text": text, "kind": kind} for ts, text, kind in reversed(rows)]
 
 
 def _list_photos():
