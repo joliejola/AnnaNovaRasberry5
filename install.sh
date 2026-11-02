@@ -201,7 +201,9 @@ sudo -u "${ANNA_USER}" "${VENV_DIR}/bin/pip" install \
   requests \
   silero-vad \
   pyusb \
-  opencv-python-headless
+  opencv-python-headless \
+  resemblyzer \
+  librosa
 # picamera2 en hailo_platform komen uit de system packages (--system-site-packages)
 ok "venv klaar in ${VENV_DIR}"
 
@@ -216,11 +218,12 @@ print("models cached")
 
 # ---------------------------------------------------------------------------
 log "9/10 — Anna-scripts + persona + webpagina's + database"
-for f in anna-nova.py nachtslaap.py vision.py respeaker_doa.py; do
+for f in anna-nova.py nachtslaap.py vision.py respeaker_doa.py anna-sync.py anna-enroll.py; do
   install -o "${ANNA_USER}" -g "${ANNA_USER}" -m 644 \
     "${SCRIPT_DIR}/${f}" "${ANNA_DIR}/${f}"
 done
-chmod +x "${ANNA_DIR}/anna-nova.py" "${ANNA_DIR}/nachtslaap.py"
+chmod +x "${ANNA_DIR}/anna-nova.py" "${ANNA_DIR}/nachtslaap.py" \
+         "${ANNA_DIR}/anna-sync.py" "${ANNA_DIR}/anna-enroll.py"
 
 # Persona (bewerk-vriendelijk — Jolanda schrijft hier Anna's kern)
 if [[ ! -f "${ANNA_DIR}/persona.md" ]]; then
@@ -276,6 +279,11 @@ CREATE TABLE IF NOT EXISTS fragments (
 CREATE TABLE IF NOT EXISTS persona_history (
   date TEXT PRIMARY KEY,
   block TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS voices (
+  name TEXT PRIMARY KEY,
+  embedding BLOB NOT NULL,
+  enrolled_at TEXT NOT NULL
 );
 INSERT OR IGNORE INTO persona_history (date, block) VALUES (
   date('now', '-1 day'),
@@ -335,10 +343,38 @@ Unit=anna-slaap.service
 WantedBy=timers.target
 EOF
 
+cat > /etc/systemd/system/anna-sync.service <<EOF
+[Unit]
+Description=Anna Nova — foto-sync naar extern scherm (SFTP/rsync)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=${ANNA_USER}
+WorkingDirectory=${ANNA_DIR}
+EnvironmentFile=${ANNA_DIR}/.env
+ExecStart=${VENV_DIR}/bin/python ${ANNA_DIR}/anna-sync.py
+EOF
+
+cat > /etc/systemd/system/anna-sync.timer <<EOF
+[Unit]
+Description=Anna Nova foto-sync (elke 15 minuten als PHOTO_UPLOAD_ENABLED=true)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Unit=anna-sync.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl daemon-reload
 systemctl enable anna-nova.service
 systemctl enable anna-slaap.timer
-ok "services ingeschakeld"
+systemctl enable anna-sync.timer
+ok "services ingeschakeld (anna-nova + slaap-timer + sync-timer)"
 
 # ---------------------------------------------------------------------------
 log "Installatie klaar"

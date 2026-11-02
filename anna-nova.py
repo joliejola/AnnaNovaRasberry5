@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import queue
+import random
 import re
 import signal
 import sqlite3
@@ -37,6 +38,15 @@ from silero_vad import load_silero_vad, get_speech_timestamps
 
 import respeaker_doa
 import vision
+
+# Voiceprint (optioneel). Als resemblyzer niet geïnstalleerd is, draait Anna
+# zonder herkenning — graceful fallback.
+try:
+    from resemblyzer import VoiceEncoder, preprocess_wav  # type: ignore
+    _VOICE_ENCODER = None
+    _VOICE_AVAILABLE = True
+except ImportError:
+    _VOICE_AVAILABLE = False
 
 # ----- Config uit .env (ingeladen door systemd EnvironmentFile) -------------
 BRAIN               = os.environ.get("BRAIN", "local")
@@ -71,9 +81,36 @@ SLEEP_PHRASES       = os.environ.get(
     "SLEEP_PHRASES",
     "slaap lekker,slaap zacht,welterusten,ga slapen,ga maar slapen,ga rusten,"
     "doe een dutje,val maar in slaap,tot morgen,slaap maar,genoeg geweest,"
-    "stil nu,anna slapen"
+    "stil nu,anna slapen,dag anna,doei anna"
 )
 SLEEP_ACK           = os.environ.get("SLEEP_ACK", "Mmh. Welterusten.")
+
+# Grace-period: zacht afscheid als een gesprek stilletjes doodloopt (AWAKE_TIMEOUT)
+GRACE_FAREWELL_ENABLED = os.environ.get("GRACE_FAREWELL_ENABLED", "true").lower() == "true"
+GRACE_FAREWELL_PROB    = float(os.environ.get("GRACE_FAREWELL_PROB", "0.5"))
+GRACE_FAREWELL_LINES   = os.environ.get(
+    "GRACE_FAREWELL_LINES",
+    "Nou. Fijn.|Tot ziens dan.|Mmh.|Nou dan.|Dag.|Ik ga weer stil zijn."
+).split("|")
+
+# Ambient-sluimer: Anna mompelt af en toe tijdens sluimer, zodat ze "aan" voelt
+AMBIENT_ENABLED      = os.environ.get("AMBIENT_ENABLED", "true").lower() == "true"
+AMBIENT_INTERVAL_SEC = float(os.environ.get("AMBIENT_INTERVAL_SEC", "300"))   # 5 min
+AMBIENT_PROB         = float(os.environ.get("AMBIENT_PROB", "0.4"))
+AMBIENT_LINES        = os.environ.get(
+    "AMBIENT_LINES",
+    "Mmh.|Ik droom van iets groens.|Iemand had een hoed, geloof ik.|"
+    "Het is nog niet morgen.|...|Ik hoor niemand.|"
+    "Zo stil.|Ik denk aan Portugal.|Mm, licht."
+).split("|")
+
+# Automatische cloud-fallback: als lokaal brein faalt, en MISTRAL_API_KEY is er, probeer cloud
+FALLBACK_TO_CLOUD    = os.environ.get("FALLBACK_TO_CLOUD", "true").lower() == "true"
+
+# Voiceprint-herkenning (Jolanda + Bodil): optioneel, via resemblyzer
+# Als resemblyzer niet geïnstalleerd is: hoofdlus draait zonder voiceprint.
+VOICEPRINT_ENABLED   = os.environ.get("VOICEPRINT_ENABLED", "true").lower() == "true"
+VOICEPRINT_THRESHOLD = float(os.environ.get("VOICEPRINT_THRESHOLD", "0.75"))
 
 WEB_DIR             = os.environ.get("WEB_DIR", str(Path.home() / "anna-nova/web"))
 PHOTOS_DIR          = os.environ.get("PHOTOS_DIR", str(Path.home() / "anna-nova/photos"))
@@ -226,6 +263,57 @@ class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
 
 
+def _load_known_voices():
+    """{name: embedding (ndarray)} uit SQLite. Lege dict als tabel leeg/missing."""
+    out = {}
+    if not _VOICE_AVAILABLE or not VOICEPRINT_ENABLED:
+        return out
+    try:
+        import numpy as np
+        with db() as conn:
+            # ensure table
+            conn.execute("CREATE TABLE IF NOT EXISTS voices "
+                         "(name TEXT PRIMARY KEY, embedding BLOB, enrolled_at TEXT)")
+            rows = conn.execute("SELECT name, embedding FROM voices").fetchall()
+        import struct as _struct
+        for name, blob in rows:
+            n = len(blob) // 4
+            vec = np.array(_struct.unpack(f"{n}f", blob), dtype="float32")
+            out[name] = vec
+    except Exception as e:
+        log.debug(f"voices lezen faalde: {e}")
+    return out
+
+_KNOWN_VOICES = {}
+
+def identify_speaker(audio_np) -> str | None:
+    """Return naam ('jolanda', 'bodil', …) of None.
+    Gaat silent als resemblyzer ontbreekt of niemand enrolled is."""
+    global _VOICE_ENCODER, _KNOWN_VOICES
+    if not _VOICE_AVAILABLE or not VOICEPRINT_ENABLED:
+        return None
+    if not _KNOWN_VOICES:
+        _KNOWN_VOICES = _load_known_voices()
+        if not _KNOWN_VOICES:
+            return None
+    try:
+        import numpy as np
+        if _VOICE_ENCODER is None:
+            _VOICE_ENCODER = VoiceEncoder()  # type: ignore[name-defined]
+        wav = preprocess_wav(audio_np, source_sr=SAMPLE_RATE)  # type: ignore[name-defined]
+        emb = _VOICE_ENCODER.embed_utterance(wav)
+        best_name, best_sim = None, -1.0
+        for name, ref in _KNOWN_VOICES.items():
+            sim = float(np.dot(emb, ref) / (np.linalg.norm(emb) * np.linalg.norm(ref) + 1e-9))
+            if sim > best_sim:
+                best_sim, best_name = sim, name
+        if best_name and best_sim >= VOICEPRINT_THRESHOLD:
+            return best_name
+    except Exception as e:
+        log.debug(f"voiceprint-fout: {e}")
+    return None
+
+
 def _list_messages():
     """Laatste ~50 fragments uit SQLite voor het chat-scherm.
     Filter: geen [STIL], geen [FOTO:...] (die zijn fotomoments, niet gespreksregels)."""
@@ -334,6 +422,16 @@ def build_system_prompt(vision_state: dict) -> str:
     )
     mood = vision_state.get("mood_hint", "niet zichtbaar")
 
+    speaker_name = (vision_state.get("speaker_name") or "").strip().lower()
+    if speaker_name == "jolanda":
+        who_line = "GESPREKSPARTNER: **Jolanda** — je maker. Je mag plagen, verwijzen naar Portugal/klei/jullie geschiedenis."
+    elif speaker_name == "bodil":
+        who_line = "GESPREKSPARTNER: **Bodil** — atelier-genoot. Vertrouwd, gelijkwaardig. Geen uitleg over het project nodig."
+    elif speaker_name:
+        who_line = f"GESPREKSPARTNER: **{speaker_name.title()}** (stem herkend; onbekende naam uit database)."
+    else:
+        who_line = "GESPREKSPARTNER: onbekende bezoeker. Nieuwsgierig, voorzichtig met plagen."
+
     core = _load_persona_core()
     arc = current_persona()
 
@@ -348,7 +446,7 @@ def build_system_prompt(vision_state: dict) -> str:
 
 ## WIE ER NU IS
 
-- GESPREKSPARTNER: de persoon op de spreekplek. Aan haar of hem richt je je antwoord.
+- {who_line}
 - PUBLIEK: {publiek}
 - Stemming (ruwe schatting uit camera): {mood}
 
@@ -393,47 +491,42 @@ def _stream_sentences(iter_lines, extract):
         yield buf.strip()
 
 
-def think_stream(user_text: str, vision_state: dict):
-    """Yield Anna's antwoord zin-voor-zin zodra het model ze produceert.
-    Zo start TTS vóór het hele antwoord klaar is → time-to-first-audio <2s."""
-    sys_prompt = build_system_prompt(vision_state)
+def _stream_cloud(user_text: str, sys_prompt: str):
+    if not MISTRAL_API_KEY:
+        raise RuntimeError("MISTRAL_API_KEY leeg")
+    r = requests.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+        json={
+            "model": MISTRAL_MODEL,
+            "messages": [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_text},
+            ],
+            "temperature": 0.8,
+            "max_tokens": 160,
+            "stream": True,
+        },
+        timeout=60,
+        stream=True,
+    )
+    r.raise_for_status()
+    def _mistral(line):
+        s = line.decode("utf-8") if isinstance(line, bytes) else line
+        if not s.startswith("data: "):
+            return ""
+        data = s[6:].strip()
+        if data == "[DONE]":
+            return None
+        try:
+            d = json.loads(data)
+            return d["choices"][0]["delta"].get("content", "")
+        except Exception:
+            return ""
+    yield from _stream_sentences(r.iter_lines(), _mistral)
 
-    if BRAIN == "cloud":
-        if not MISTRAL_API_KEY:
-            raise RuntimeError("BRAIN=cloud maar MISTRAL_API_KEY leeg")
-        r = requests.post(
-            "https://api.mistral.ai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
-            json={
-                "model": MISTRAL_MODEL,
-                "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_text},
-                ],
-                "temperature": 0.8,
-                "max_tokens": 160,
-                "stream": True,
-            },
-            timeout=60,
-            stream=True,
-        )
-        r.raise_for_status()
-        def _mistral(line):
-            s = line.decode("utf-8") if isinstance(line, bytes) else line
-            if not s.startswith("data: "):
-                return ""
-            data = s[6:].strip()
-            if data == "[DONE]":
-                return None
-            try:
-                d = json.loads(data)
-                return d["choices"][0]["delta"].get("content", "")
-            except Exception:
-                return ""
-        yield from _stream_sentences(r.iter_lines(), _mistral)
-        return
 
-    # Local via Ollama
+def _stream_local(user_text: str, sys_prompt: str):
     r = requests.post(
         f"{OLLAMA_HOST}/api/chat",
         json={
@@ -455,6 +548,24 @@ def think_stream(user_text: str, vision_state: dict):
             return None
         return d.get("message", {}).get("content", "")
     yield from _stream_sentences(r.iter_lines(), _ollama)
+
+
+def think_stream(user_text: str, vision_state: dict):
+    """Yield Anna's antwoord zin-voor-zin zodra het model ze produceert.
+    Zo start TTS vóór het hele antwoord klaar is → time-to-first-audio <2s.
+    Bij lokaal brein-fout + beschikbare MISTRAL_API_KEY → stille cloud-fallback."""
+    sys_prompt = build_system_prompt(vision_state)
+    primary = _stream_cloud if BRAIN == "cloud" else _stream_local
+    try:
+        yield from primary(user_text, sys_prompt)
+        return
+    except Exception as e:
+        if BRAIN == "local" and FALLBACK_TO_CLOUD and MISTRAL_API_KEY:
+            log.warning(f"lokaal brein faalde ({e}) → cloud-fallback")
+            debug_log(f"fallback → cloud ({type(e).__name__})", "init")
+            yield from _stream_cloud(user_text, sys_prompt)
+            return
+        raise
 
 
 def think(user_text: str, vision_state: dict) -> str:
@@ -658,7 +769,8 @@ class Listener:
             log.debug(f"audio-status: {status}")
         self.audio_q.put(indata[:, 0].copy())
 
-    def listen_once(self) -> str | None:
+    def listen_once(self):
+        """Return (transcript, raw_audio_ndarray) of (None, None)."""
         buf: list[np.ndarray] = []
         last_voice_ts: float | None = None
         heard_voice = False
@@ -693,14 +805,14 @@ class Listener:
                     break
 
         if not heard_voice:
-            return None
+            return None, None
 
         audio = np.concatenate(buf)
         segments, _ = self.asr.transcribe(
             audio, language=WHISPER_LANG, vad_filter=False, beam_size=1
         )
         text = " ".join(s.text.strip() for s in segments).strip()
-        return text or None
+        return (text or None), audio
 
 
 # ----- Hoofdlus -------------------------------------------------------------
@@ -743,23 +855,49 @@ def main() -> int:
 
     is_awake = False
     last_activity = time.monotonic()
+    last_ambient  = time.monotonic()
+    had_real_gesprek = False  # was er in deze wake-sessie een echte uitwisseling?
     set_state("sluimert")
     log.info("Anna sluimert — zeg 'Hoi Anna Nova' om haar wakker te maken.")
 
+    current_speaker: str | None = None
+
     while not stop:
         try:
-            heard = listener.listen_once()
+            heard, raw_audio = listener.listen_once()
         except Exception as e:
             log.warning(f"luister-fout: {e}")
             time.sleep(1)
             continue
 
+        # Ambient-mompel tijdens sluimer: Anna leeft ook alleen
+        now = time.monotonic()
+        if (not is_awake and AMBIENT_ENABLED
+                and now - last_ambient > AMBIENT_INTERVAL_SEC):
+            last_ambient = now
+            if random.random() < AMBIENT_PROB and AMBIENT_LINES:
+                line = random.choice(AMBIENT_LINES).strip()
+                if line:
+                    debug_log(f'ambient: "{line}"', "init")
+                    say(line, log_fragment_too=False)
+                    set_state("sluimert")
+
         if not heard:
-            if is_awake and (time.monotonic() - last_activity > AWAKE_TIMEOUT):
+            if is_awake and (now - last_activity > AWAKE_TIMEOUT):
                 log.info("stilte duurt — Anna valt terug in sluimer")
                 debug_log("sluimer (stilte duurt te lang)", "sleep")
+                # Grace-period: zacht afscheid als er een echt gesprek was
+                if (had_real_gesprek and GRACE_FAREWELL_ENABLED
+                        and random.random() < GRACE_FAREWELL_PROB
+                        and GRACE_FAREWELL_LINES):
+                    farewell = random.choice(GRACE_FAREWELL_LINES).strip()
+                    if farewell:
+                        debug_log(f'afscheid: "{farewell}"', "speak")
+                        say(farewell, log_fragment_too=False)
                 is_awake = False
+                had_real_gesprek = False
                 set_state("sluimert")
+                last_ambient = time.monotonic()  # reset ambient na afscheid
             continue
 
         if not is_awake:
@@ -767,6 +905,7 @@ def main() -> int:
                 log.info(f"wake: '{heard}'")
                 debug_log(f'wake: "{heard}"', "wake")
                 is_awake = True
+                had_real_gesprek = False
                 last_activity = time.monotonic()
                 log_fragment(heard, "visitor")
                 set_state("luistert")
@@ -797,12 +936,22 @@ def main() -> int:
             debug_log(f'buiten spreekplek: "{heard[:40]}"', "skip")
             continue
 
-        log.info(f"Bezoeker: {heard}")
-        debug_log(f'bezoeker: "{heard}"', "visitor")
+        # Voiceprint-check (optioneel, graceful)
+        speaker = identify_speaker(raw_audio) if raw_audio is not None else None
+        if speaker and speaker != current_speaker:
+            current_speaker = speaker
+            debug_log(f"stem herkend: {speaker}", "wake")
+
+        log.info(f"Bezoeker ({current_speaker or 'onbekend'}): {heard}")
+        debug_log(f'{current_speaker or "bezoeker"}: "{heard}"', "visitor")
         log_fragment(heard, "visitor")
+        had_real_gesprek = True  # markeer: er is een echt gesprek, afscheid is op zijn plaats
 
         set_state("denkt")
         vs = vision.get_state()
+        # Geef identity mee aan de prompt (als bekend)
+        vs = dict(vs)
+        vs["speaker_name"] = current_speaker
 
         # STREAMING: start met spreken zodra de eerste zin klaar is.
         t0 = time.monotonic()
