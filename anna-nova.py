@@ -851,8 +851,20 @@ class Listener:
         audio = np.concatenate(buf)
         debug_log(f"transcribeert ({len(audio)/SAMPLE_RATE:.1f}s audio)…", "state")
         t_asr = time.monotonic()
+        # Bias Whisper richting Anna's gespreks-vocabulaire. Dit helpt tegen
+        # "wakker" → "fucker", "anna" → "ooyama", enz.
+        _prompt = (
+            "Nederlands gesprek met Anna Nova, een stille kunstmatige stem. "
+            "De bezoeker zegt dingen als: Hoi Anna Nova. Hallo Anna. "
+            "Word wakker Anna. Wat zie je? Wie ben jij? Slaap lekker."
+        )
         segments, _ = self.asr.transcribe(
-            audio, language=WHISPER_LANG, vad_filter=False, beam_size=1
+            audio,
+            language=WHISPER_LANG,
+            vad_filter=False,
+            beam_size=5,
+            initial_prompt=_prompt,
+            temperature=0.0,
         )
         text = " ".join(s.text.strip() for s in segments).strip()
         debug_log(f"whisper: {time.monotonic()-t_asr:.1f}s → \"{(text or '…')[:40]}\"", "state")
