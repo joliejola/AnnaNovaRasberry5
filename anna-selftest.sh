@@ -1,17 +1,34 @@
 #!/bin/bash
-# Self-test: Piper spreekt via speaker → mic hoort → Anna reageert
+# Self-test: Piper spreekt via speaker → mic hoort → Anna reageert.
+# Gebruikt dezelfde Piper-stem als Anna (uit .env), anders klinkt de
+# "bezoeker" alsof er een tweede robot in de kamer staat.
 
-PIPER=/home/anna/anna-nova/piper/piper/piper
-MODEL=/home/anna/anna-nova/piper/nl_NL-mls_7432-low.onnx
-SPEAKER=plughw:CARD=AUDIO,DEV=0
+if [ -f /home/anna/anna-nova/.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . /home/anna/anna-nova/.env
+  set +a
+fi
+
+PIPER="${PIPER_BIN:-/home/anna/anna-nova/piper/piper/piper}"
+MODEL="${PIPER_VOICE:-/home/anna/anna-nova/piper/nl_NL-mls_7432-low.onnx}"
+SPEAKER="${AUDIO_OUTPUT_DEVICE:-plughw:CARD=AUDIO,DEV=0}"
+
+# Piper sample rate uit voice-json aflezen (nathalie=22050, sommige=16000)
+VOICE_JSON="${MODEL}.json"
+if [ -f "$VOICE_JSON" ]; then
+  SR=$(python3 -c "import json;print(json.load(open('$VOICE_JSON')).get('audio',{}).get('sample_rate',22050))" 2>/dev/null)
+fi
+SR="${SR:-22050}"
+echo "selftest voice: $(basename "$MODEL")  @  ${SR}Hz  →  $SPEAKER"
 
 say() {
   echo ''
   echo "══════════════════════════════════"
   echo "bezoeker zegt: \"$1\""
   echo "══════════════════════════════════"
-  echo "$1" | $PIPER --model $MODEL --output_raw 2>/dev/null | \
-    aplay -D $SPEAKER -q -r 22050 -f S16_LE -c 1 2>/dev/null
+  echo "$1" | "$PIPER" --model "$MODEL" --output_raw 2>/dev/null | \
+    aplay -D "$SPEAKER" -q -r "$SR" -f S16_LE -c 1 2>/dev/null
 }
 
 watch_state() {
