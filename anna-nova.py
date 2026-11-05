@@ -66,7 +66,8 @@ PIPER_VOICE         = os.environ.get("PIPER_VOICE", "")
 
 ANNA_DB             = os.environ.get("ANNA_DB", str(Path.home() / "anna-nova/anna.db"))
 ALLOW_SILENCE       = os.environ.get("ALLOW_SILENCE", "true").lower() == "true"
-END_OF_TURN_SILENCE = float(os.environ.get("END_OF_TURN_SILENCE", "0.9"))
+END_OF_TURN_SILENCE = float(os.environ.get("END_OF_TURN_SILENCE", "2.0"))
+MAX_LISTEN_MS       = int(os.environ.get("MAX_LISTEN_MS", "60000"))
 
 SPEAK_ANGLE_CENTER  = int(os.environ.get("SPEAK_ANGLE_CENTER", "0"))
 SPEAK_ANGLE_MARGIN  = int(os.environ.get("SPEAK_ANGLE_MARGIN", "30"))
@@ -842,7 +843,7 @@ class Listener:
                 if heard_voice and last_voice_ts is not None:
                     if now - last_voice_ts > END_OF_TURN_SILENCE:
                         break
-                if len(buf) * BLOCK_MS > 20000:
+                if len(buf) * BLOCK_MS > MAX_LISTEN_MS:
                     break
 
         if not heard_voice:

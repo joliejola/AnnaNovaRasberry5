@@ -3,16 +3,23 @@
 # Gebruikt dezelfde Piper-stem als Anna (uit .env), anders klinkt de
 # "bezoeker" alsof er een tweede robot in de kamer staat.
 
-if [ -f /home/anna/anna-nova/.env ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . /home/anna/anna-nova/.env
-  set +a
-fi
+envget() {
+  # Pak alleen de 3 keys die we nodig hebben, strip quotes.
+  awk -F= -v k="$1" '
+    $0 ~ "^"k"=" {
+      sub("^"k"=", "");
+      gsub(/^["\x27]|["\x27]$/, "");
+      print;
+      exit
+    }' /home/anna/anna-nova/.env 2>/dev/null
+}
 
-PIPER="${PIPER_BIN:-/home/anna/anna-nova/piper/piper/piper}"
-MODEL="${PIPER_VOICE:-/home/anna/anna-nova/piper/nl_NL-mls_7432-low.onnx}"
-SPEAKER="${AUDIO_OUTPUT_DEVICE:-plughw:CARD=AUDIO,DEV=0}"
+PIPER="$(envget PIPER_BIN)"
+PIPER="${PIPER:-/home/anna/anna-nova/piper/piper/piper}"
+MODEL="$(envget PIPER_VOICE)"
+MODEL="${MODEL:-/home/anna/anna-nova/piper/nl_NL-mls_7432-low.onnx}"
+SPEAKER="$(envget AUDIO_OUTPUT_DEVICE)"
+SPEAKER="${SPEAKER:-plughw:CARD=AUDIO,DEV=0}"
 
 # Piper sample rate uit voice-json aflezen (nathalie=22050, sommige=16000)
 VOICE_JSON="${MODEL}.json"
