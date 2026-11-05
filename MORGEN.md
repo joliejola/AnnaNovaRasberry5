@@ -397,3 +397,57 @@ Slaap-woord: **"Slaap lekker"**, **"Dag Anna"**, **"Welterusten"**, **"Tot morge
 Trek de stekker, slaap een nacht, probeer morgen opnieuw. De SD-kaart raakt niet corrupt bij uittrekken (overlay-fs beschermt). Als álles stuk is: flash een nieuwe SD, draai `install.sh` opnieuw — ze onthoudt alleen Anna's `persona.md` kwijt (persona-geschiedenis in `anna.db` gaat verloren tenzij je die apart hebt gesaved).
 
 Veel succes. Zet 'r aan.
+
+---
+
+## Deel 11 — USB wifi-adapter aansluiten (als-ie binnen is)
+
+Pi 5's ingebouwde wifi is zwak — upload naar Mistral/Voxtral is ~70× langzamer dan op je laptop. Zodra de **TP-Link Archer T3U** (of soortgelijke RTL8812BU-dongle) binnen is:
+
+### 11.1 Driver installeren (eenmalig)
+
+```bash
+ssh annanova "sudo apt update && sudo apt install -y realtek-rtl88x2bu-dkms linux-headers-\$(uname -r) && sudo reboot"
+```
+
+Pi reboot zichzelf.
+
+### 11.2 Adapter inpluggen
+
+- Plug de T3U in een **USB 3 poort** (blauwe USB-poort — die zijn sneller)
+- Wacht ~5 sec, de dongle licht op
+- Check: `ssh annanova 'ip link show'` — je zou `wlan0` (ingebouwd) én `wlan1` (dongle) moeten zien
+
+### 11.3 Wifi verbinden via nieuwe adapter
+
+```bash
+ssh annanova 'nmtui'   # tekst-UI: Activate connection → kies je SSID op wlan1
+```
+
+Of commando:
+```bash
+ssh annanova 'sudo nmcli dev wifi connect "[jouw-SSID]" password "[jouw-wifi-wachtwoord]" ifname wlan1'
+```
+
+### 11.4 Ingebouwde chip disablen (zodat alle verkeer via T3U gaat)
+
+```bash
+ssh annanova 'sudo nmcli radio wifi on; sudo nmcli dev disconnect wlan0'
+```
+
+### 11.5 Test snelheid
+
+```bash
+ssh annanova 'time curl -s -o /dev/null https://speed.hetzner.de/5MB.bin'
+```
+
+Moet nu < 1 sec zijn (was ~2 sec via ingebouwde chip). Voxtral calls dalen van 2-13 sec → 0.5-1 sec.
+
+### 11.6 Rollback als 't niet werkt
+
+Trek de dongle eruit, reboot:
+```bash
+ssh annanova 'sudo reboot'
+```
+
+Pi pakt dan weer de ingebouwde wifi.
