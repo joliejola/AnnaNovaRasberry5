@@ -2,7 +2,58 @@
 
 *Jolanda heeft 1 dag. Doel: een **leuke bot die kan exposeren** — leuk reageert, makkelijk mee te praten.*
 
-**Nieuwe werkwijze**: ik (Claude) drijf de testcycli. Jij beslist alleen op moment-van-keuze (stem, filter, "voelt dit als Anna?"). Elke iteratie: ik test → ik rapporteer → jij beslist → ik implementeer → ik hertest.
+**Werkwijze**: ik (Claude) drijf de testcycli met 3 parallelle tracks tegelijk. Jij beslist alleen op 7 beslismomenten. Rest doe ik in de achtergrond.
+
+---
+
+## PARALLEL WERKEN — 3 tracks tegelijk
+
+Omdat de Pi maar 1 ding is, splitsen we werk zo dat we **niet op elkaar wachten**:
+
+### 🅰️ Hoofd-track (jij + ik, serieel) — werkt LIVE op Pi
+- UI-stadia samen bekijken
+- Stem kiezen
+- Gesprek-arc ontwerpen
+- Conversatie-tests draaien
+- Persona-iteraties
+
+**Alles wat de Pi raakt gaat hier doorheen**, want Anna is 1 service en 1 mic.
+
+### 🅱️ Parallel-track "foto-pijplijn" (autonome agent) — werkt lokaal
+- Foto-filter code schrijven (4 varianten in vision.py)
+- Rate-limit implementeren
+- Galerij-site HTML + CSS maken (GitHub Pages)
+- Anna-sync.py doorlopen + fixen
+
+**Geen Pi nodig**. Commits apart. Als track 🅰️ klaar is met basics → mergen we 🅱️'s werk in, pullen op Pi, 1 test.
+
+### 🅲️ Parallel-track "wake + stem" (autonome agent) — werkt lokaal
+- Download 3 extra Piper stemmen + pre-render samples
+- Schrijf `anna-selftest-wake.sh` (10 wake-attempts met variatie)
+- Schrijf `anna-selftest-silence.sh`
+- Research ElevenLabs/Azure NL-TTS prijzen + API-flow
+
+**Geen Pi nodig**. Levert jou bij fase 4 (stem-kiezen) een kant-en-klaar samples-pakket.
+
+### Convergentie-momenten
+
+- **09:45** — 🅲️ levert stem-samples bij fase 4 (jij kiest)
+- **12:30** — 🅱️ levert foto-filters bij fase 8 (jij kiest)
+- **12:45** — 🅱️ levert galerij-skelet bij fase 9 (ik push + testen)
+
+Resultaat: in plaats van 7u serieel werk → **~3,5u** door parallel-aanpak.
+
+### Ik start de agents om 09:00
+
+Zodra jij "ga" zegt:
+1. Ik start sessie 🅱️ met brief voor foto-pijplijn
+2. Ik start sessie 🅲️ met brief voor stem+wake
+3. Beiden werken autonoom in hun eigen git branch
+4. Jij en ik werken aan 🅰️ in main-branch
+
+Als parallel-sessie klaar is → ze posten het resultaat terug naar mij, ik merge + jij test.
+
+---
 
 ---
 
