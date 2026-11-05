@@ -155,6 +155,50 @@
     @keyframes ldot { 0%,100% { opacity: 0.25; transform: scale(0.9); }
                       50%     { opacity: 1;    transform: scale(1.1); } }
 
+    /* Denkt: draaikolk van puntjes in de anna-regel (12 puntjes rond centrum) */
+    .vortex {
+      display: inline-block;
+      position: relative;
+      width: 14vmin; height: 14vmin;
+      vertical-align: middle;
+    }
+    .vortex .spin {
+      position: absolute; inset: 0;
+      animation: vortexspin 2.4s linear infinite;
+      transform-origin: 50% 50%;
+    }
+    .vortex i {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 1.3vmin; height: 1.3vmin; margin: -0.65vmin 0 0 -0.65vmin;
+      border-radius: 50%;
+      background: #f4b860;
+    }
+    /* 12 puntjes op cirkel, met trailing opacity (komet-staart) */
+    .vortex i:nth-child(1)  { transform: rotate(  0deg) translateX(6.0vmin); opacity: 1.00; }
+    .vortex i:nth-child(2)  { transform: rotate( 30deg) translateX(5.6vmin); opacity: 0.85; }
+    .vortex i:nth-child(3)  { transform: rotate( 60deg) translateX(5.2vmin); opacity: 0.70; }
+    .vortex i:nth-child(4)  { transform: rotate( 90deg) translateX(4.8vmin); opacity: 0.55; }
+    .vortex i:nth-child(5)  { transform: rotate(120deg) translateX(4.4vmin); opacity: 0.42; }
+    .vortex i:nth-child(6)  { transform: rotate(150deg) translateX(4.0vmin); opacity: 0.30; }
+    .vortex i:nth-child(7)  { transform: rotate(180deg) translateX(3.6vmin); opacity: 0.22; }
+    .vortex i:nth-child(8)  { transform: rotate(210deg) translateX(3.2vmin); opacity: 0.15; width: 1.1vmin; height: 1.1vmin; }
+    .vortex i:nth-child(9)  { transform: rotate(240deg) translateX(2.8vmin); opacity: 0.11; width: 1.0vmin; height: 1.0vmin; }
+    .vortex i:nth-child(10) { transform: rotate(270deg) translateX(2.4vmin); opacity: 0.08; width: 0.9vmin; height: 0.9vmin; }
+    .vortex i:nth-child(11) { transform: rotate(300deg) translateX(2.0vmin); opacity: 0.06; width: 0.8vmin; height: 0.8vmin; }
+    .vortex i:nth-child(12) { transform: rotate(330deg) translateX(1.6vmin); opacity: 0.04; width: 0.7vmin; height: 0.7vmin; }
+    @keyframes vortexspin { to { transform: rotate(360deg); } }
+    /* Kleine centrale kern-pulse */
+    .vortex::after {
+      content: "";
+      position: absolute; top: 50%; left: 50%;
+      width: 1.2vmin; height: 1.2vmin; margin: -0.6vmin 0 0 -0.6vmin;
+      border-radius: 50%;
+      background: #f4b860;
+      opacity: 0.9;
+      animation: ldot 1.4s ease-in-out infinite;
+    }
+
     /* Denken: drie kleine deeltjes die rond het midden draaien (toegevoegd aan fx) */
     /* Spreken: puls in de center-box */
     body.state-spreekt .center { animation: breathe 1.4s ease-in-out infinite; }
@@ -288,16 +332,23 @@
   setInterval(refreshFrame, 1000);
 
   // --- helpers ---
-  let lastVisitor = "", lastAnna = "", lastDebugTs = "", lastVisitorHTML = "";
+  let lastVisitor = "", lastAnna = "", lastDebugTs = "", lastVisitorHTML = "", lastAnnaHTML = "";
   const DOTS_HTML = '<span class="live-dots"><i></i><i></i><i></i></span>';
+  const VORTEX_HTML = '<span class="vortex"><span class="spin"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>';
   function setLine(lineEl, textEl, newText) {
     if (!newText) { lineEl.classList.remove("visible"); textEl.textContent = ""; return; }
     textEl.textContent = newText;
     requestAnimationFrame(() => lineEl.classList.add("visible"));
   }
-  function setLineHTML(lineEl, textEl, html) {
+  function setVisitorHTML(lineEl, textEl, html) {
     if (html === lastVisitorHTML) return;
     lastVisitorHTML = html;
+    textEl.innerHTML = html;
+    requestAnimationFrame(() => lineEl.classList.add("visible"));
+  }
+  function setAnnaHTML(lineEl, textEl, html) {
+    if (html === lastAnnaHTML) return;
+    lastAnnaHTML = html;
     textEl.innerHTML = html;
     requestAnimationFrame(() => lineEl.classList.add("visible"));
   }
@@ -330,23 +381,30 @@
 
       const vLine = document.getElementById("l-visitor");
       const vText = document.getElementById("t-visitor");
-      // LIVE: tijdens luistert/transcribeert tonen we pulserende puntjes
-      // (zodat je meteen ziet dat de mic haar oppikt, lang vóór Whisper klaar is)
+      const aLine = document.getElementById("l-anna");
+      const aText = document.getElementById("t-anna");
+      // LIVE: tijdens luistert/transcribeert tonen we pulserende puntjes in
+      // de bezoeker-lijn (zodat je ziet dat de mic haar oppikt, vóór Whisper klaar is).
       const transcribingNow = debugItems.length
         && debugItems[debugItems.length-1].kind === "state"
         && /transcribeert/i.test(debugItems[debugItems.length-1].msg);
       if (state === "luistert" || transcribingNow) {
-        setLineHTML(vLine, vText, DOTS_HTML);
-        lastVisitor = "";  // forceer dat nieuwe echte text straks toch gezet wordt
+        setVisitorHTML(vLine, vText, DOTS_HTML);
+        lastVisitor = "";
       } else if (v !== lastVisitor) {
         lastVisitor = v;
         lastVisitorHTML = v;
         setLine(vLine, vText, v);
       }
-      if (a !== lastAnna) {
+      // DENKT: draaikolk van puntjes in de anna-lijn — duidelijk visueel
+      // signaal dat ze nadenkt (ipv een leeg vlak).
+      if (state === "denkt") {
+        setAnnaHTML(aLine, aText, VORTEX_HTML);
+        lastAnna = "";
+      } else if (a !== lastAnna) {
         lastAnna = a;
-        setLine(document.getElementById("l-anna"),
-                document.getElementById("t-anna"), a);
+        lastAnnaHTML = a;
+        setLine(aLine, aText, a);
       }
 
       // Status-balk: "action" = wat Anna NU doet (state-kind debug events)
