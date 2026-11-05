@@ -14,16 +14,90 @@ Elke blok heeft **doel, tijd, concrete stappen, afvinkregel** (= hoe weet je dat
 3. Slaap-commando werkt + scherm wordt leeg
 4. Chromium opent face.html bij Pi-reboot zonder Jolanda-input
 5. Persona voelt als Anna, niet als ChatGPT
+6. **Antwoord-lengte** voelt goed (niet 3-zinnen monologen, niet "Hm.")
+7. **Gesprek-geheugen** werkt — Anna refereert aan wat je 1 beurt terug zei
+8. **Foto's zijn vaag/geabstraheerd** (AVG-safe) — geen herkenbare gezichten op galerij
+9. **Foto-rate limiet** — Anna maakt max 1 foto per 10 min (anders overspoelt ze de galerij)
 
 **SHOULD HAVE**:
-6. Camera aangesloten + werkend (dan ziet Anna wie er voor haar staat)
-7. Wake-match werkt op "Hoi Anna" / "Hallo Anna" / "Word wakker Anna"
+10. Camera aangesloten + werkend (dan ziet Anna wie er voor haar staat)
+11. Wake-match werkt op "Hoi Anna" / "Hallo Anna" / "Word wakker Anna"
+12. Externe foto-galerij publiek + bereikbaar via URL
 
 **NICE TO HAVE** (alleen als tijd):
-8. Externe foto-galerij publiek
-9. USB wifi-dongel ingeplugd (kers op taart, maakt alles snel)
+13. USB wifi-dongel ingeplugd (kers op taart, maakt alles snel)
+14. SD-backup image gemaakt
 
 Als rond 15:00 blok 1-5 niet klaar zijn → SKIP blok 6-8 en ga direct naar blok 9 + eindcheck.
+
+---
+
+---
+
+## Retest-lijst — dingen van gisteren die opnieuw bevestigd moeten
+
+Deze zijn gister ingevoerd maar nog niet volledig getest. Vink af in sanity-check (blok 1) en sessies:
+
+- [ ] **Voxtral ASR** werkt (debug toont `voxtral: 0.X s → "..."` ipv `whisper: XX s`)
+- [ ] **Whisper fallback** werkt als Voxtral faalt (zet wifi eventueel kort uit)
+- [ ] **Wake zonder "Hm."** — "Hoi Anna Nova" → Anna reageert direct met zin, niet eerst "Hm."
+- [ ] **Session-reset bij slaap** — oude zinnen VERDWIJNEN uit face.html na "Slaap lekker"
+- [ ] **Session-reset bij wake** — face.html is leeg bij nieuwe wake
+- [ ] **Vignette per state** — rood pulserend (sluimer), open (luistert), goud (denkt), oranje (spreekt)
+- [ ] **Draaikolk** verschijnt bij "denkt" (Jolanda vond deze leuk)
+- [ ] **Live-puntjes** bij luistert/transcribeert
+- [ ] **CPU-throttle** — `ps aux --sort=-%cpu` toont anna-nova <30% in sluimer
+- [ ] **Autostart Chromium** — na reboot opent face.html automatisch zonder jouw input
+- [ ] **Pi-desktop iconen** — alle 5 (gezicht/OPNIEUW/start/stop/logs) werken
+- [ ] **Ruimere wake-match** — "Word wakker Anna", "Hallo Anna", "Hey Anna" trigger ook
+- [ ] **Persona-bio** — Anna noemt katten, Portugal, Bodil als ernaar gevraagd
+- [ ] **"Nooit [STIL]"** — Anna antwoordt altijd, zuchten mag
+
+Als één van deze niet werkt na restart, is dat de eerste prioriteit voor Blok 4 / 8 (persona-iteraties → code-fix).
+
+---
+
+## Anna's stem — niet blij met nathalie?
+
+Probeer-luisteren kan hier:
+- **Alle Piper NL-stemmen**: <https://rhasspy.github.io/piper-samples/> (kies "Dutch" filter)
+  - `nl_BE-nathalie-medium` (huidige keus — Vlaams, vrouw, zacht)
+  - `nl_NL-mls_7432-low` (oude keus — robot-achtig, lo-fi)
+  - `nl_NL-mls-medium` (multi-speaker vrouw/man, 52 stemmen — speaker-id vereist)
+  - `nl_NL-rdh-medium` (Nederlands, man, warm)
+  - `nl_NL-mls_5809-low` (Nederlands, vrouw, ander karakter dan 7432)
+
+Cloud-TTS alternatieven (als Piper niet bevalt):
+- **ElevenLabs** — natuurlijkste stem ter wereld, Nederlandse opties, €5/mnd start. API-integratie =
+  vervang `say()` in anna-nova.py door HTTP POST. Latency ~800ms, kwaliteit onmiskenbaar beter.
+- **OpenAI TTS** (`tts-1` of `tts-1-hd`) — 6 voices, spreekt alle talen inclusief NL redelijk. $0.015/1k char.
+- **Mistral** heeft GEEN TTS (wel Voxtral voor ASR). Dus geen ene-stop-shop.
+- **Azure Neural TTS** — Nederlandse stemmen (ColetteNeural, FennaNeural, MaartenNeural) klinken écht
+  menselijk. Pay-per-use, ~$16/1M char.
+
+Morgen even samen 2-3 stemmen vergelijken: ik download `nl_NL-mls_5809` en `nl_NL-rdh-medium` erbij
+zodat je vanaf de Pi kan switchen via `.env` + restart. Beslissing kan je maken vóór de expositie.
+
+### Wordt het sneller als TTS ook in de cloud zit? (Nee, eigenlijk niet)
+
+Begrijpelijke hypothese: "als alles via Mistral gaat is het één stack, dus sneller."
+Werkelijkheid:
+
+| component | locatie nu | latency |
+|---|---|---|
+| ASR (Voxtral) | Mistral cloud | 0.3–2s (vooral netwerk) |
+| LLM (Mistral) | Mistral cloud | 0.5–2s (vooral netwerk) |
+| TTS (Piper nathalie) | Pi lokaal | 0.1–0.3s (geen netwerk) |
+
+Piper is sneller dan elke cloud-TTS omdat er géén netwerk-call bij zit. Mistral heeft geen TTS, en elke
+andere cloud-TTS (ElevenLabs, OpenAI, Azure) voegt juist 500-1500ms toe. Dus voor **snelheid**: Piper
+lokaal houden.
+
+Voor **natuurlijkheid**: cloud wint. Wat de moeite waard kan zijn als de stem écht niet bevalt — dan
+is +1s latency misschien acceptabel voor een stem die niet robot klinkt. Bespreek morgen.
+
+**Beste snelle test**: luister vanaf jouw Mac even naar Piper-samples op <https://rhasspy.github.io/piper-samples/>
+en op ElevenLabs demo, dan weet je of 1s extra het waard is.
 
 ---
 
@@ -114,6 +188,48 @@ Uit testplan sessie B:
 5. "Wat zou je willen als je een lichaam had?"
 
 **Afvinkregel**: Anna refereert minstens 1x aan Jolanda/Bodil/Portugal/katten (persona-context werkt), en stelt in minstens 2 beurten een vraag terug.
+
+## Blok 5b — Geheugen-test | 10 min | 10:30
+
+**Doel**: controleer dat `HISTORY_TURNS=2` werkt — Anna onthoudt de vorige beurt maar niet alles.
+
+Zeg:
+1. "Mijn hond heet Pluk." → Anna antwoordt
+2. "Hoe heet mijn hond?" → **verwacht**: "Pluk" (geheugen van 1 beurt terug)
+3. Zeg 3-4 andere dingen tussendoor
+4. "Hoe heet mijn hond nog?" → **verwacht**: ze weet het NIET meer (want >2 beurten terug)
+
+Daarna: "Slaap lekker" → "Hoi Anna" → "Hoe heet mijn hond?" → **verwacht**: ze weet het niet (geheugen reset bij slaap).
+
+**Afvinkregel**:
+- ✅ "Pluk" onthouden binnen 1-2 beurten
+- ✅ "Pluk" vergeten na 3+ beurten
+- ✅ "Pluk" vergeten na slaap/wake
+
+Als geheugen níet werkt: check in anna-nova.py of `remember_turn()` wordt aangeroepen na elk antwoord, en of `_RECENT_TURNS` wordt meegestuurd in `_stream_cloud`.
+
+## Blok 5c — Antwoord-lengte afstellen | 15 min | 10:40
+
+**Doel**: fine-tunen hoe lang Anna's antwoorden mogen zijn.
+
+Huidige instelling: `max_tokens=120` (Mistral), persona zegt "meestal één zin".
+
+Test-zin om lengte te meten: "Vertel over Portugal."
+- Antwoord is 1 zin → mooi
+- Antwoord is 2-3 zinnen → acceptabel als relevant
+- Antwoord is 4+ zinnen → te lang, verlaag `max_tokens` naar 80
+- Antwoord is 0-3 woorden ("Mooi land.") → te kort, verhoog `max_tokens` naar 160
+
+Aanpassen (tijdelijk in .env):
+```bash
+# Als te lang
+ssh annanova "sudo sed -i 's|^MAX_TOKENS=.*|MAX_TOKENS=80|' /home/anna/anna-nova/.env"
+# (als MAX_TOKENS niet in .env staat, moet in anna-nova.py zelf)
+```
+
+Voor permanente wijziging: in anna-nova.py, `_stream_cloud`, verander de `"max_tokens": 120` lijn + commit+push.
+
+**Afvinkregel**: 5 verschillende vragen geven elk een antwoord dat voelt "net goed" — niet afgehakt, niet uitgelopen.
 
 ## Blok 6 — Sessie D (zacht/mompelen) | 10 min | 10:30
 
@@ -213,11 +329,67 @@ Zelfde korte vragen als blok 3. Vergelijk timings.
 
 **Afvinkregel**: elk antwoord binnen 3 sec ipv 5-8 sec.
 
-## Blok 14 — Externe foto-galerij (optioneel, als tijd) | 1 uur
+## Blok 14a — Foto-privacy filter (AVG-safe) | 30 min
 
-Volg [TESTPLAN_MORGEN.md blok 3](TESTPLAN_MORGEN.md#blok-3). Alleen doen als blokken 1-13 ✅ zijn en je nog tijd/energie hebt.
+**Doel**: foto's die Anna maakt zijn **vaag/geabstraheerd** zodat ze NIET AVG-problematic zijn. Bezoekers mogen niet herkenbaar zijn op de publieke galerij.
 
-Keuze kort: Netlify/GitHub Pages gratis. Pi doet elke 15 min rsync.
+Keuze filter (we tunen samen morgen):
+- **A. Zware blur** (snelste, simpelste) — cv2.GaussianBlur, kernel 51x51. Mensen worden kleurblokken.
+- **B. Mozaïek/pixelate** (artistiek, retro) — resize naar 20x20 en terug naar origineel = blokjes.
+- **C. Edge-only sketch** (artistiek, geen huid zichtbaar) — Canny edge detect op grayscale.
+- **D. Hailo SCRFD face-blur** (alleen gezichten blurren) — vereist werkende SCRFD HEF. Mooiste maar complex.
+
+Aanbeveling: **A + B combi** (blur zwaar + pixelate 40x40) = snel, altijd AVG-safe, ziet er artistiek uit.
+
+Code-aanpassing in `vision.py` (of `anna-nova.py` _take_photo):
+```python
+import cv2
+def anonymize(frame):
+    # Pixelate (artistiek, onherkenbaar)
+    h, w = frame.shape[:2]
+    small = cv2.resize(frame, (40, int(40*h/w)), interpolation=cv2.INTER_LINEAR)
+    pixel = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+    # Extra blur eroverheen voor zachte randjes
+    return cv2.GaussianBlur(pixel, (21, 21), 0)
+```
+
+Toe te passen in `save_latest_photo` in vision.py: pak het frame, run `anonymize()` erover, schrijf dan weg.
+
+**Afvinkregel**: maak 1 foto, download hem, check dat geen gezicht herkenbaar is maar wel kleuren/sfeer zichtbaar.
+
+## Blok 14b — Foto rate-limit | 10 min
+
+**Doel**: Anna mag niet elke beurt een foto maken — max 1 per 10 min. Anders overspoelt ze de galerij en wordt het saai + AVG-risk.
+
+In `anna-nova.py` een variabele `_last_photo_ts` + check in `_take_photo`:
+```python
+_last_photo_ts = 0
+PHOTO_MIN_INTERVAL_SEC = int(os.environ.get("PHOTO_MIN_INTERVAL_SEC", "600"))
+
+def _take_photo(caption):
+    global _last_photo_ts
+    now = time.monotonic()
+    if now - _last_photo_ts < PHOTO_MIN_INTERVAL_SEC:
+        log.info("fotograaf: te snel na vorige foto — overgeslagen")
+        debug_log("foto overgeslagen (rate-limit)", "photo")
+        return None
+    _last_photo_ts = now
+    # ... rest van bestaande code
+```
+
+In .env: `PHOTO_MIN_INTERVAL_SEC=600` (10 min). Voor demo kan je naar 60 (1 min) zetten om te testen.
+
+**Afvinkregel**: na 1 foto wordt elke [FOTO]-tag binnen 10 min genegeerd (zie log "rate-limit").
+
+## Blok 14c — Externe foto-galerij publiek | 45 min
+
+Volg [TESTPLAN_MORGEN.md blok 3](TESTPLAN_MORGEN.md#blok-3). Alleen doen als 1-13 ✅.
+
+Keuze kort: Netlify of GitHub Pages — beiden gratis. Pi doet elke 15 min rsync via `anna-sync.timer`.
+
+**Belangrijk**: upload alleen de GEANONIMISEERDE foto's (uit blok 14a). Check in anna-sync.py of de bron-folder de geanonimiseerde versies bevat, anders upload je alsnog de originele + heb je AVG-probleem.
+
+**Afvinkregel**: galerij-URL open je in browser → ziet onherkenbare, artistieke beelden.
 
 ## Blok 15 — Eindcheck voor expositie | 15 min
 
