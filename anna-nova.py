@@ -60,6 +60,11 @@ AUDIO_IN            = os.environ.get("AUDIO_INPUT_DEVICE", "default")
 AUDIO_OUT           = os.environ.get("AUDIO_OUTPUT_DEVICE", "default")
 WHISPER_MODEL_NAME  = os.environ.get("WHISPER_MODEL", "small")
 WHISPER_LANG        = os.environ.get("WHISPER_LANGUAGE", "nl")
+# ASR engine: "whisper" (lokaal faster-whisper) of "voxtral" (Mistral cloud).
+# Voxtral is veel sneller (<1s voor korte zinnen) en gebruikt dezelfde
+# MISTRAL_API_KEY. Kost ~$0.006/min audio.
+ASR_ENGINE          = os.environ.get("ASR_ENGINE", "whisper").lower()
+VOXTRAL_MODEL       = os.environ.get("VOXTRAL_MODEL", "voxtral-mini-latest")
 
 PIPER_BIN           = os.environ.get("PIPER_BIN", "")
 PIPER_VOICE         = os.environ.get("PIPER_VOICE", "")
@@ -493,6 +498,31 @@ def _stream_sentences(iter_lines, extract):
         yield buf.strip()
 
 
+def _transcribe_voxtral(audio_f32: "np.ndarray") -> str | None:
+    """POST een float32 mono @16kHz audio-array naar Mistral Voxtral,
+    krijg de transcript terug. Snelheid: ~0.5-1.5s voor 2-10s audio."""
+    import io, wave
+    # numpy float32 → int16 WAV in-memory
+    pcm = (np.clip(audio_f32, -1.0, 1.0) * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes(pcm.tobytes())
+    buf.seek(0)
+    r = requests.post(
+        "https://api.mistral.ai/v1/audio/transcriptions",
+        headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+        files={"file": ("speech.wav", buf, "audio/wav")},
+        data={"model": VOXTRAL_MODEL, "language": WHISPER_LANG},
+        timeout=15,
+    )
+    r.raise_for_status()
+    j = r.json()
+    return (j.get("text") or "").strip() or None
+
+
 def _stream_cloud(user_text: str, sys_prompt: str):
     if not MISTRAL_API_KEY:
         raise RuntimeError("MISTRAL_API_KEY leeg")
@@ -852,27 +882,34 @@ class Listener:
         audio = np.concatenate(buf)
         debug_log(f"transcribeert ({len(audio)/SAMPLE_RATE:.1f}s audio)…", "state")
         t_asr = time.monotonic()
-        # Bias Whisper richting Anna's gespreks-vocabulaire.
-        _prompt = (
-            "Nederlands gesprek met Anna Nova. "
-            "Hoi Anna Nova. Hallo Anna. Word wakker Anna. "
-            "Wat zie je? Wie ben jij? Slaap lekker."
-        )
-        # beam_size=1 is 3-5x sneller dan beam 5; met initial_prompt is
-        # accuracy op base+ model goed genoeg. Snelheid is kritiek voor
-        # een voice-bot waar wachttijd afleidend werkt.
-        segments, _ = self.asr.transcribe(
-            audio,
-            language=WHISPER_LANG,
-            vad_filter=False,
-            beam_size=1,
-            initial_prompt=_prompt,
-            temperature=0.0,
-            without_timestamps=True,
-            condition_on_previous_text=False,
-        )
-        text = " ".join(s.text.strip() for s in segments).strip()
-        debug_log(f"whisper: {time.monotonic()-t_asr:.1f}s → \"{(text or '…')[:40]}\"", "state")
+        text = None
+        if ASR_ENGINE == "voxtral" and MISTRAL_API_KEY:
+            try:
+                text = _transcribe_voxtral(audio)
+                debug_log(f"voxtral: {time.monotonic()-t_asr:.1f}s → \"{(text or '…')[:40]}\"", "state")
+            except Exception as e:
+                log.warning(f"voxtral faalde ({e}) → whisper fallback")
+                debug_log(f"voxtral-fout: {type(e).__name__} → whisper", "error")
+                text = None
+        if text is None:
+            # Lokale Whisper (fallback of default)
+            _prompt = (
+                "Nederlands gesprek met Anna Nova. "
+                "Hoi Anna Nova. Hallo Anna. Word wakker Anna. "
+                "Wat zie je? Wie ben jij? Slaap lekker."
+            )
+            segments, _ = self.asr.transcribe(
+                audio,
+                language=WHISPER_LANG,
+                vad_filter=False,
+                beam_size=1,
+                initial_prompt=_prompt,
+                temperature=0.0,
+                without_timestamps=True,
+                condition_on_previous_text=False,
+            )
+            text = " ".join(s.text.strip() for s in segments).strip()
+            debug_log(f"whisper: {time.monotonic()-t_asr:.1f}s → \"{(text or '…')[:40]}\"", "state")
         return (text or None), audio
 
 
