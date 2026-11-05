@@ -855,12 +855,26 @@ class Listener:
             device=dev_idx,
             callback=self._callback,
         ):
+            # VAD throttle: niet elke 32ms-chunk langs Silero (3-15% CPU
+            # per 100ms) maar elke ~128ms. Scheelt flink op Pi CPU in sluimer.
+            vad_every_n = max(1, int(128 / BLOCK_MS))  # ≈ 4 chunks
+            tick = 0
             while True:
                 try:
                     chunk = self.audio_q.get(timeout=5.0)
                 except queue.Empty:
                     continue
                 buf.append(chunk)
+                tick += 1
+                if tick % vad_every_n != 0:
+                    # Toch end-of-turn detectie zodat break-logica werkt
+                    now = time.monotonic()
+                    if heard_voice and last_voice_ts is not None \
+                       and now - last_voice_ts > END_OF_TURN_SILENCE:
+                        break
+                    if len(buf) * BLOCK_MS > MAX_LISTEN_MS:
+                        break
+                    continue
                 window = np.concatenate(buf[-int(1000 / BLOCK_MS):])
                 stamps = get_speech_timestamps(
                     window, self.vad, sampling_rate=SAMPLE_RATE,
