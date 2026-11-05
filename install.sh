@@ -13,7 +13,9 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuratie — pas aan als je andere paden/user wilt
 # ---------------------------------------------------------------------------
-ANNA_USER="${SUDO_USER:-$USER}"
+# Vast op 'anna' — als root ingelogd (zonder sudo) kwam alles anders in
+# /home/root/ terecht. Overschrijven kan: sudo ANNA_USER=pi ./install.sh
+ANNA_USER="${ANNA_USER:-anna}"
 ANNA_HOME="/home/${ANNA_USER}"
 ANNA_DIR="${ANNA_HOME}/anna-nova"
 VENV_DIR="${ANNA_DIR}/venv"
@@ -34,11 +36,15 @@ SCHERM_REFRESH=60
 SCHERM_BOOST=7      # 0-11 — hoger = sterker HDMI-signaal (voor lange kabels)
 
 # Hailo Model Zoo HEF-URLs voor Hailo-8L
-# Bronnen: hailo-ai/hailo_model_zoo releases.
+# Model Zoo v2.17 hoort bij HailoRT 4.23 (wat hailo-all op Trixie installeert).
 # Als deze URLs 404'en, controleer handmatig op:
-#   https://github.com/hailo-ai/hailo_model_zoo/tree/master/docs/public_models/HAILO8L
-SCRFD_HEF_URL="https://hailo-csdata.s3.eu-west-2.amazonaws.com/public_models/hailo8l/FaceDetection/scrfd_2_5g/pretrained/2024-06-21/scrfd_2_5g.hef"
-FACE_ATTR_HEF_URL="https://hailo-csdata.s3.eu-west-2.amazonaws.com/public_models/hailo8l/FaceAttribute/face_attr_resnet_v1_18/pretrained/2024-06-20/face_attr_resnet_v1_18.hef"
+#   https://github.com/hailo-ai/hailo_model_zoo/tree/v2.17/docs/public_models/HAILO8L
+HEF_BASE="https://hailo-model-zoo.s3.eu-west-2.amazonaws.com/ModelZoo/Compiled/v2.17.0/hailo8l"
+SCRFD_HEF_URL="${HEF_BASE}/scrfd_2.5g.hef"
+FACE_ATTR_HEF_URL="${HEF_BASE}/face_attr_resnet_v1_18.hef"
+
+# Alle downloads: falen bij HTTP-fouten en blijven proberen bij wifi-hikjes
+CURL="curl -fL --retry 15 --retry-delay 5 --retry-all-errors"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -49,6 +55,8 @@ warn() { printf "  \033[1;33m!\033[0m %s\n" "$*"; }
 die()  { printf "\n\033[1;31m✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Run dit script als root: sudo ./install.sh"
+[[ "${ANNA_USER}" != "root" ]] || die "ANNA_USER mag niet root zijn"
+id "${ANNA_USER}" >/dev/null 2>&1 || die "Gebruiker '${ANNA_USER}' bestaat niet — maak die eerst aan (Raspberry Pi Imager) of zet ANNA_USER=..."
 
 # ---------------------------------------------------------------------------
 log "Omgevingscheck"
@@ -62,8 +70,8 @@ ok "OS: ${PRETTY_NAME}  ·  arch: $(uname -m)  ·  user: ${ANNA_USER}"
 # ---------------------------------------------------------------------------
 log "1/10 — Systeem updaten"
 apt-get update
-apt-get -y full-upgrade
-ok "apt up-to-date"
+# Geen full-upgrade: crashte de Pi bij het uitpakken van chromium + qt.
+ok "apt-lijsten bijgewerkt"
 
 # ---------------------------------------------------------------------------
 log "2/10 — Basispakketten"
@@ -73,8 +81,8 @@ apt-get install -y \
   build-essential pkg-config \
   sqlite3 \
   dkms \
-  alsa-utils \
-  libatlas-base-dev libopenblas-dev \
+  alsa-utils libportaudio2 \
+  libopenblas-dev \
   libusb-1.0-0 libhidapi-hidraw0 \
   jq
 ok "basispakketten klaar"
@@ -87,7 +95,7 @@ ok "hailo-all geïnstalleerd"
 # ---------------------------------------------------------------------------
 log "4/10 — config.txt + EEPROM"
 CFG=/boot/firmware/config.txt
-cp -n "$CFG" "${CFG}.anna-backup"
+[[ -f "${CFG}.anna-backup" ]] || cp "$CFG" "${CFG}.anna-backup"
 grep -q '^camera_auto_detect=0'   "$CFG" || echo 'camera_auto_detect=0'   >> "$CFG"
 grep -q '^dtoverlay=ov5647,cam0'  "$CFG" || echo 'dtoverlay=ov5647,cam0'  >> "$CFG"
 grep -q '^usb_max_current_enable=1' "$CFG" || echo 'usb_max_current_enable=1' >> "$CFG"
@@ -114,6 +122,20 @@ fi
 
 ok "config.txt bijgewerkt"
 
+# cmdline.txt: Pi 5 (KMS) negeert hdmi_cvt hierboven — de resolutie moet via
+# video=. IPv6 uit: TLS-timeouts naar Mistral/GitHub over wifi.
+CMDLINE=/boot/firmware/cmdline.txt
+if [[ -f "$CMDLINE" ]]; then
+  [[ -f "${CMDLINE}.anna-backup" ]] || cp "$CMDLINE" "${CMDLINE}.anna-backup"
+  HDMI_NAME="HDMI-A-$((SCHERM_HDMI_PORT + 1))"
+  grep -q "video=${HDMI_NAME}:" "$CMDLINE" || \
+    sed -i "1 s|\$| video=${HDMI_NAME}:${SCHERM_WIDTH}x${SCHERM_HEIGHT}@${SCHERM_REFRESH}|" "$CMDLINE"
+  grep -q 'ipv6.disable=1' "$CMDLINE" || sed -i '1 s|$| ipv6.disable=1|' "$CMDLINE"
+  ok "cmdline.txt: video=${HDMI_NAME}:${SCHERM_WIDTH}x${SCHERM_HEIGHT} + ipv6.disable=1"
+else
+  warn "${CMDLINE} niet gevonden — scherm-resolutie en IPv6 niet aangepast"
+fi
+
 if command -v rpi-eeprom-config >/dev/null; then
   CUR=$(rpi-eeprom-config || true)
   if ! echo "$CUR" | grep -q '^PSU_MAX_CURRENT=5000'; then
@@ -131,7 +153,7 @@ fi
 # ---------------------------------------------------------------------------
 log "5/10 — Ollama + model (${MODEL_LOCAL})"
 if ! command -v ollama >/dev/null; then
-  curl -fsSL https://ollama.com/install.sh | sh
+  $CURL -sS https://ollama.com/install.sh | sh
 fi
 systemctl enable --now ollama || true
 # Wacht tot ollama API bereikbaar is (max 30s)
@@ -149,8 +171,8 @@ log "6/10 — Piper (TTS) + Nederlandse stem"
 PIPER_DIR="${ANNA_DIR}/piper"
 sudo -u "${ANNA_USER}" mkdir -p "${PIPER_DIR}"
 if [[ ! -x "${PIPER_DIR}/piper/piper" ]]; then
-  sudo -u "${ANNA_USER}" curl -L \
-    "https://github.com/rhasspy/piper/releases/latest/download/piper_arm64.tar.gz" \
+  sudo -u "${ANNA_USER}" $CURL \
+    "https://github.com/rhasspy/piper/releases/latest/download/piper_linux_aarch64.tar.gz" \
     -o "${PIPER_DIR}/piper.tgz"
   sudo -u "${ANNA_USER}" tar -xzf "${PIPER_DIR}/piper.tgz" -C "${PIPER_DIR}"
   rm -f "${PIPER_DIR}/piper.tgz"
@@ -167,8 +189,8 @@ case "${PIPER_VOICE}" in
   *)                   VOICE_PATH="mls_7432/low/nl_NL-mls_7432-low" ;;
 esac
 if [[ ! -f "${PIPER_DIR}/${PIPER_VOICE}.onnx" ]]; then
-  sudo -u "${ANNA_USER}" curl -L "${VOICE_BASE}/${VOICE_PATH}.onnx"      -o "${PIPER_DIR}/${PIPER_VOICE}.onnx"
-  sudo -u "${ANNA_USER}" curl -L "${VOICE_BASE}/${VOICE_PATH}.onnx.json" -o "${PIPER_DIR}/${PIPER_VOICE}.onnx.json"
+  sudo -u "${ANNA_USER}" $CURL "${VOICE_BASE}/${VOICE_PATH}.onnx"      -o "${PIPER_DIR}/${PIPER_VOICE}.onnx"
+  sudo -u "${ANNA_USER}" $CURL "${VOICE_BASE}/${VOICE_PATH}.onnx.json" -o "${PIPER_DIR}/${PIPER_VOICE}.onnx.json"
 fi
 ok "Piper + ${PIPER_VOICE} klaar"
 
@@ -176,13 +198,13 @@ ok "Piper + ${PIPER_VOICE} klaar"
 log "7/10 — Hailo HEF-modellen downloaden (SCRFD + face_attr)"
 sudo -u "${ANNA_USER}" mkdir -p "${MODELS_DIR}"
 if [[ ! -f "${MODELS_DIR}/scrfd_2_5g.hef" ]]; then
-  if ! sudo -u "${ANNA_USER}" curl -fL "${SCRFD_HEF_URL}" -o "${MODELS_DIR}/scrfd_2_5g.hef"; then
+  if ! sudo -u "${ANNA_USER}" $CURL "${SCRFD_HEF_URL}" -o "${MODELS_DIR}/scrfd_2_5g.hef"; then
     warn "SCRFD-URL faalde — download handmatig vanaf Hailo Model Zoo en zet in ${MODELS_DIR}/"
     rm -f "${MODELS_DIR}/scrfd_2_5g.hef"
   fi
 fi
 if [[ ! -f "${MODELS_DIR}/face_attr_resnet_v1_18.hef" ]]; then
-  if ! sudo -u "${ANNA_USER}" curl -fL "${FACE_ATTR_HEF_URL}" -o "${MODELS_DIR}/face_attr_resnet_v1_18.hef"; then
+  if ! sudo -u "${ANNA_USER}" $CURL "${FACE_ATTR_HEF_URL}" -o "${MODELS_DIR}/face_attr_resnet_v1_18.hef"; then
     warn "face_attr-URL faalde — niet kritiek, mood-hint blijft 'neutraal'"
     rm -f "${MODELS_DIR}/face_attr_resnet_v1_18.hef"
   fi
@@ -311,6 +333,8 @@ cat > /etc/systemd/system/anna-nova.service <<EOF
 Description=Anna Nova (sluimert tot "Hoi Anna Nova")
 After=network-online.target ollama.service sound.target
 Wants=network-online.target ollama.service
+StartLimitBurst=10
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
@@ -320,9 +344,6 @@ EnvironmentFile=${ANNA_DIR}/.env
 ExecStart=${VENV_DIR}/bin/python ${ANNA_DIR}/anna-nova.py
 Restart=always
 RestartSec=5
-StartLimitBurst=10
-StartLimitIntervalSec=120
-RuntimeWatchdogSec=30
 
 [Install]
 WantedBy=multi-user.target
@@ -381,11 +402,28 @@ Unit=anna-sync.service
 WantedBy=timers.target
 EOF
 
+# Wifi power-save uit — veroorzaakte SSH-timeouts en mislukte downloads
+cat > /etc/systemd/system/wifi-powersave-off.service <<EOF
+[Unit]
+Description=Wifi power-save uit (wlan0)
+After=sys-subsystem-net-devices-wlan0.device
+BindsTo=sys-subsystem-net-devices-wlan0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/iw dev wlan0 set power_save off
+
+[Install]
+WantedBy=sys-subsystem-net-devices-wlan0.device
+EOF
+
 systemctl daemon-reload
 systemctl enable anna-nova.service
 systemctl enable anna-slaap.timer
 systemctl enable anna-sync.timer
-ok "services ingeschakeld (anna-nova + slaap-timer + sync-timer)"
+systemctl enable wifi-powersave-off.service
+ok "services ingeschakeld (anna-nova + slaap-timer + sync-timer + wifi-powersave-off)"
 
 # ---------------------------------------------------------------------------
 log "Installatie klaar"
