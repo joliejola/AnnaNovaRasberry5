@@ -117,35 +117,24 @@
       pointer-events: none;
     }
     .line {
-      line-height: 1.22;
+      line-height: 1.18;
       opacity: 0;
       transform: translateY(14px);
       transition: opacity 0.6s ease, transform 0.6s ease;
       max-width: 100%;
-      margin: 1.2vmin 0;
+      margin: 1.6vmin 0;
     }
     .line.visible { opacity: 1; transform: translateY(0); }
-    .line .who {
-      display: block;
-      font-size: 2.6vmin;
-      letter-spacing: 0.22em;
-      text-transform: lowercase;
-      opacity: 0.75;
-      margin-bottom: 1vmin;
-      font-weight: 500;
-      font-family: ui-monospace, Menlo, monospace;
-    }
+    .line .who { display: none; }
     .line .text {
       display: block;
       font-size: 8.5vmin;
-      font-weight: 500;
       line-height: 1.18;
-      font-family: Georgia, serif;
+      font-family: -apple-system, "SF Pro Display", "Helvetica Neue", "Inter", sans-serif;
+      letter-spacing: -0.01em;
     }
-    .line.visitor .who  { color: #fff5ea; }
-    .line.visitor .text { color: #fff5ea; font-style: normal; font-weight: 400; }
-    .line.anna    .who  { color: #f4b860; }
-    .line.anna    .text { color: #fdeecf; font-style: italic; }
+    .line.visitor .text { color: #fff5ea; font-weight: 300; opacity: 0.88; }
+    .line.anna    .text { color: #fdeecf; font-weight: 500; }
 
     /* Denken: drie kleine deeltjes die rond het midden draaien (toegevoegd aan fx) */
     /* Spreken: puls in de center-box */
