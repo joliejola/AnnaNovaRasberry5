@@ -31,6 +31,7 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 
 import numpy as np
+from scipy import signal as _scisig
 import requests
 import sounddevice as sd
 from silero_vad import load_silero_vad, get_speech_timestamps
@@ -768,7 +769,13 @@ class Listener:
     def _callback(self, indata, frames, time_info, status):
         if status:
             log.debug(f"audio-status: {status}")
-        self.audio_q.put(indata[:, 0].copy())
+        chunk = indata[:, 0].copy()
+        ns = getattr(self, "_native_sr", SAMPLE_RATE)
+        if ns != SAMPLE_RATE:
+            # resample native → 16000 voor VAD/whisper
+            n_out = int(len(chunk) * SAMPLE_RATE / ns)
+            chunk = _scisig.resample(chunk, n_out).astype("float32")
+        self.audio_q.put(chunk)
 
     def listen_once(self):
         """Return (transcript, raw_audio_ndarray) of (None, None)."""
@@ -776,12 +783,19 @@ class Listener:
         last_voice_ts: float | None = None
         heard_voice = False
 
+        dev_idx = _resolve_audio_device(AUDIO_IN)
+        try:
+            dev_info = sd.query_devices(dev_idx, "input")
+            native_sr = int(dev_info["default_samplerate"])
+        except Exception:
+            native_sr = SAMPLE_RATE
+        self._native_sr = native_sr
         with sd.InputStream(
-            samplerate=SAMPLE_RATE,
+            samplerate=native_sr,
             channels=1,
-            blocksize=BLOCK_SIZE,
+            blocksize=int(BLOCK_MS * native_sr / 1000),
             dtype="float32",
-            device=_resolve_audio_device(AUDIO_IN),
+            device=dev_idx,
             callback=self._callback,
         ):
             while True:
