@@ -648,12 +648,13 @@ def _normalize(s: str) -> str:
     return s
 
 def wake_match(transcript: str, phrase: str = WAKE_PHRASE) -> bool:
-    """Fuzzy match voor 'Hoi Anna Nova' en mishoorde varianten.
+    """Fuzzy match voor meerdere wake-commando's en mishoorde varianten.
 
-    Whisper-small verwart 'Anna' regelmatig met 'ooyama', 'ohana', 'hannah',
-    'hannover', 'hanna', 'yama', etc. 'Nova' is relatief uniek, dus als dat
-    voorkomt in combinatie met een greeting of met een anna-achtig woord is
-    het heel waarschijnlijk de wake-phrase."""
+    Accepteert: 'Hoi Anna Nova', 'Hoi Anna', 'Hallo Anna', 'Word wakker Anna',
+    'Wordt wakker Anna', 'Hey Anna', etc. Whisper-small verwart 'Anna' regelmatig
+    met 'ooyama', 'ohana', 'hannah', 'hannover', 'yama' — die worden ook herkend.
+    'Nova' of 'wakker' zijn zo uniek dat een greeting + een van beide genoeg is.
+    """
     t = _normalize(transcript)
     want = _normalize(phrase)
     # Exacte substring: altijd goed
@@ -662,20 +663,27 @@ def wake_match(transcript: str, phrase: str = WAKE_PHRASE) -> bool:
     tokens = t.split()
     if not tokens:
         return False
+    # Groet-woorden (ha, he zijn risky dus alleen als losse token)
     groet_hits = any(g in tokens for g in (
-        "hoi", "hallo", "hey", "he", "hee", "dag", "oh", "ha",
+        "hoi", "hallo", "hey", "he", "hee", "dag", "oh", "ha", "ok",
         "goedemiddag", "goedemorgen", "goedenavond",
     ))
+    # Wakker-commando's: "word wakker", "wordt wakker", "wakker worden", etc.
+    wakker_hits = "wakker" in tokens or "wakker" in t
     heeft_nova = "nova" in t
-    # Anna-achtige woorden die Whisper regelmatig produceert:
+    # Anna-achtige woorden die Whisper regelmatig produceert bij zwak audio:
     anna_like = ("anna", "ana", "hanna", "ohana", "ohanna", "yama",
-                 "ooyama", "hannah", "hanover", "hannover", "nana")
+                 "ooyama", "hannah", "hanover", "hannover", "nana",
+                 "ane", "ama", "hana")
     heeft_anna_like = any(w in t for w in anna_like)
-    # 'nova' is zo'n uniek woord dat een greeting ervoor + 'nova' voldoende is
+    # 'nova' uniek: greeting ervoor OF anna-achtig ervoor → wake
     if heeft_nova and (heeft_anna_like or groet_hits):
         return True
-    # Of klassiek: echte 'anna' + (nova of groet)
-    if "anna" in t and (heeft_nova or groet_hits):
+    # 'wakker' + anna(-achtig) → wake. "Word wakker Anna", "Wordt wakker Anna".
+    if wakker_hits and heeft_anna_like:
+        return True
+    # Klassiek: echte 'anna' + (nova of groet of wakker)
+    if "anna" in t and (heeft_nova or groet_hits or wakker_hits):
         return True
     return False
 
