@@ -569,8 +569,8 @@ def _stream_cloud(user_text: str, sys_prompt: str):
         json={
             "model": MISTRAL_MODEL,
             "messages": msgs,
-            "temperature": 0.9,
-            "max_tokens": 80,
+            "temperature": 0.85,
+            "max_tokens": 120,
             "stream": True,
         },
         timeout=60,

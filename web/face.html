@@ -383,29 +383,30 @@
       const vText = document.getElementById("t-visitor");
       const aLine = document.getElementById("l-anna");
       const aText = document.getElementById("t-anna");
-      // LIVE: tijdens luistert/transcribeert tonen we pulserende puntjes in
-      // de bezoeker-lijn (zodat je ziet dat de mic haar oppikt, vóór Whisper klaar is).
       const transcribingNow = debugItems.length
         && debugItems[debugItems.length-1].kind === "state"
         && /transcribeert/i.test(debugItems[debugItems.length-1].msg);
-      if (state === "luistert" || transcribingNow) {
-        setVisitorHTML(vLine, vText, DOTS_HTML);
-        lastVisitor = "";
-      } else if (v !== lastVisitor) {
-        lastVisitor = v;
-        lastVisitorHTML = v;
-        setLine(vLine, vText, v);
-      }
-      // DENKT: draaikolk van puntjes in de anna-lijn — duidelijk visueel
-      // signaal dat ze nadenkt (ipv een leeg vlak).
-      if (state === "denkt") {
-        setAnnaHTML(aLine, aText, VORTEX_HTML);
-        lastAnna = "";
-      } else if (a !== lastAnna) {
-        lastAnna = a;
-        lastAnnaHTML = a;
-        setLine(aLine, aText, a);
-      }
+
+      // Beslis wat er in de VISITOR-lijn moet komen:
+      // - luistert/transcribeert → pulserende puntjes
+      // - sluimert zonder messages → leeg (bij slaap worden oude zinnen gewist)
+      // - anders → de echte tekst
+      let visitorTarget;
+      if (state === "luistert" || transcribingNow) visitorTarget = DOTS_HTML;
+      else if (!v) visitorTarget = "";
+      else visitorTarget = escapeHtml(v);
+      setVisitorHTML(vLine, vText, visitorTarget);
+
+      // Zelfde logica voor ANNA-lijn:
+      // - denkt → draaikolk
+      // - sluimert zonder antwoord → leeg
+      // - anders → de echte tekst
+      let annaTarget;
+      if (state === "denkt") annaTarget = VORTEX_HTML;
+      else if (!a) annaTarget = "";
+      else annaTarget = escapeHtml(a);
+      setAnnaHTML(aLine, aText, annaTarget);
+      lastVisitor = v; lastAnna = a;
 
       // Status-balk: "action" = wat Anna NU doet (state-kind debug events)
       //              "heard" = laatste gehoorde zin (skip/wake/visitor)
