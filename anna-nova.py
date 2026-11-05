@@ -134,6 +134,10 @@ BLOCK_SIZE  = int(SAMPLE_RATE * BLOCK_MS / 1000)
 # ----- Globale state (gedeeld met HTTP-server) ------------------------------
 _state_lock = threading.Lock()
 CURRENT_STATE = "sluimert"  # sluimert | luistert | denkt | spreekt
+# Sessie-grens: /messages toont alleen zinnen VANAF deze iso-timestamp.
+# Wordt gereset bij wake en bij slaap, zodat oude zinnen uit vorige
+# gesprekken niet blijven hangen op het scherm.
+SESSION_START_ISO = datetime.now().isoformat(timespec="seconds")
 
 # Debug-ringbuffer — zichtbaar in /debug + onderaan het Anna-scherm.
 # Jolanda gebruikt dit om tijdens expositie-opbouw te zien wat de bot doet.
@@ -326,20 +330,30 @@ def identify_speaker(audio_np) -> str | None:
 
 
 def _list_messages():
-    """Laatste ~50 fragments uit SQLite voor het chat-scherm.
-    Filter: geen [STIL], geen [FOTO:...] (die zijn fotomoments, niet gespreksregels)."""
+    """Fragments uit SQLite van de HUIDIGE sessie voor het chat-scherm.
+    Filter: geen [STIL], geen [FOTO:...], alleen ts >= SESSION_START_ISO."""
     try:
         with db() as conn:
             rows = conn.execute(
                 "SELECT ts, text, kind FROM fragments "
                 "WHERE text != '[STIL]' "
                 "AND text NOT LIKE '[FOTO:%' "
-                "ORDER BY ts DESC LIMIT 50"
+                "AND ts >= ? "
+                "ORDER BY ts DESC LIMIT 50",
+                (SESSION_START_ISO,)
             ).fetchall()
     except Exception:
         return []
     # Chronologisch (oud eerst) voor chat-weergave
     return [{"ts": ts, "text": text, "kind": kind} for ts, text, kind in reversed(rows)]
+
+
+def reset_session_window() -> None:
+    """Zet SESSION_START_ISO op NU — daarmee zijn oudere fragments weg uit
+    /messages. Roep aan bij wake én bij slaap zodat vorige gesprekken niet
+    op het scherm blijven staan."""
+    global SESSION_START_ISO
+    SESSION_START_ISO = datetime.now().isoformat(timespec="seconds")
 
 
 def _list_photos():
@@ -555,8 +569,8 @@ def _stream_cloud(user_text: str, sys_prompt: str):
         json={
             "model": MISTRAL_MODEL,
             "messages": msgs,
-            "temperature": 0.8,
-            "max_tokens": 160,
+            "temperature": 0.9,
+            "max_tokens": 80,
             "stream": True,
         },
         timeout=60,
@@ -1045,6 +1059,7 @@ def main() -> int:
                 set_state("sluimert")
                 last_ambient = time.monotonic()  # reset ambient na afscheid
                 forget_conversation()
+                reset_session_window()
             continue
 
         if not is_awake:
@@ -1054,6 +1069,7 @@ def main() -> int:
                 is_awake = True
                 had_real_gesprek = False
                 last_activity = time.monotonic()
+                reset_session_window()  # oude zinnen weg uit /messages
                 # Geen aparte "Hm." meer — Anna antwoordt meteen via Mistral
                 # op de wake-zin zelf ("Hoi Anna Nova" → "Hoi, wat brengt je
                 # hier?"). Dat voelt welkomer dan een loze bevestiging.
@@ -1077,6 +1093,7 @@ def main() -> int:
             is_awake = False
             set_state("sluimert")
             forget_conversation()
+            reset_session_window()
             continue
 
         if not from_speak_place():
