@@ -1019,15 +1019,15 @@ def main() -> int:
                 is_awake = True
                 had_real_gesprek = False
                 last_activity = time.monotonic()
-                log_fragment(heard, "visitor")
-                set_state("luistert")
-                if WAKE_ACK:
-                    say(WAKE_ACK)
-                set_state("luistert")
+                # Geen aparte "Hm." meer — Anna antwoordt meteen via Mistral
+                # op de wake-zin zelf ("Hoi Anna Nova" → "Hoi, wat brengt je
+                # hier?"). Dat voelt welkomer dan een loze bevestiging.
+                # Fall-through naar de denk-flow hieronder (die logt zelf
+                # visitor + roept Mistral aan).
             else:
                 log.debug(f"(sluimer, niet-wake): {heard}")
                 debug_log(f'genegeerd (geen wake): "{heard[:40]}"', "skip")
-            continue
+                continue
 
         last_activity = time.monotonic()
 
