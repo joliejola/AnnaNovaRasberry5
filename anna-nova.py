@@ -573,6 +573,7 @@ def think(user_text: str, vision_state: dict) -> str:
     """Non-streaming fallback — collect alles via think_stream."""
     try:
         t0 = time.monotonic()
+        debug_log(f"denkt ({BRAIN} {MISTRAL_MODEL if BRAIN=='cloud' else OLLAMA_MODEL})…", "state")
         parts = list(think_stream(user_text, vision_state))
         result = " ".join(parts).strip()
         debug_log(f'brein ({time.monotonic()-t0:.1f}s): "{result[:60]}"', "think_end")
@@ -848,10 +849,13 @@ class Listener:
             return None, None
 
         audio = np.concatenate(buf)
+        debug_log(f"transcribeert ({len(audio)/SAMPLE_RATE:.1f}s audio)…", "state")
+        t_asr = time.monotonic()
         segments, _ = self.asr.transcribe(
             audio, language=WHISPER_LANG, vad_filter=False, beam_size=1
         )
         text = " ".join(s.text.strip() for s in segments).strip()
+        debug_log(f"whisper: {time.monotonic()-t_asr:.1f}s → \"{(text or '…')[:40]}\"", "state")
         return (text or None), audio
 
 

@@ -131,7 +131,8 @@
       text-transform: uppercase; font-weight: 500;
     }
     .status .sep { opacity: 0.35; }
-    .status .heard { opacity: 0.6; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55vmin; }
+    .status .action { color: #f4b860; font-weight: 500; }
+    .status .heard { opacity: 0.6; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45vmin; }
     .status .meta  { opacity: 0.55; margin-left: auto; }
     @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
 
@@ -191,10 +192,10 @@
           <span class="dot"></span><span id="chip-text">sluimert</span>
         </span>
         <span class="sep">·</span>
-        <span id="meta-left">mic 48k · brain phi3</span>
+        <span class="action" id="action">—</span>
         <span class="sep">·</span>
         <span class="heard" id="heard"></span>
-        <span class="meta" id="meta-right">—</span>
+        <span class="meta" id="meta-right">mistral</span>
       </div>
     </div>
   </div>
@@ -278,10 +279,30 @@
                 document.getElementById("t-anna"), a);
       }
 
-      // "Heard" in status-balk: toon laatste skip/wake/visitor uit debug
-      let heard = "", metaRight = "";
+      // Status-balk: "action" = wat Anna NU doet (state-kind debug events)
+      //              "heard" = laatste gehoorde zin (skip/wake/visitor)
+      let heard = "", action = "";
       if (debugItems.length) {
-        for (let i = debugItems.length - 1; i >= Math.max(0, debugItems.length - 8); i--) {
+        // Zoek laatste "state" kind event (= substatus: transcribeert, denkt met …, etc)
+        for (let i = debugItems.length - 1; i >= Math.max(0, debugItems.length - 12); i--) {
+          const e = debugItems[i];
+          if (e.kind === "state" && !e.msg.startsWith("staat →")) {
+            action = e.msg;
+            break;
+          }
+        }
+        // Fallback: als geen state-action, toon de hoofdstaat zelf
+        if (!action) {
+          action = {
+            sluimert: "wacht op wake",
+            luistert: "neemt op…",
+            denkt:    "denkt…",
+            spreekt:  "spreekt…",
+            offline:  "offline"
+          }[state] || "";
+        }
+        // Laatste wat ze hoorde
+        for (let i = debugItems.length - 1; i >= Math.max(0, debugItems.length - 12); i--) {
           const e = debugItems[i];
           if (e.kind === "skip" || e.kind === "wake" || e.kind === "visitor") {
             const m = e.msg.replace(/^genegeerd \(geen wake\): /, "")
@@ -291,11 +312,9 @@
             break;
           }
         }
-        const last = debugItems[debugItems.length - 1];
-        metaRight = last.ts || "";
       }
+      document.getElementById("action").textContent = action;
       document.getElementById("heard").textContent = heard;
-      document.getElementById("meta-right").textContent = metaRight;
 
     } catch (e) {
       STATES.forEach(x => document.body.classList.remove("state-" + x));
