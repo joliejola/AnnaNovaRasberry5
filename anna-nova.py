@@ -516,7 +516,7 @@ def _transcribe_voxtral(audio_f32: "np.ndarray") -> str | None:
         headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
         files={"file": ("speech.wav", buf, "audio/wav")},
         data={"model": VOXTRAL_MODEL, "language": WHISPER_LANG},
-        timeout=15,
+        timeout=(5, 30),  # (connect, read): wifi op Pi is soms traag, geef upload tijd
     )
     r.raise_for_status()
     j = r.json()
