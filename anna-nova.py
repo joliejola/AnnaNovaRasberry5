@@ -65,6 +65,10 @@ WHISPER_LANG        = os.environ.get("WHISPER_LANGUAGE", "nl")
 # MISTRAL_API_KEY. Kost ~$0.006/min audio.
 ASR_ENGINE          = os.environ.get("ASR_ENGINE", "whisper").lower()
 VOXTRAL_MODEL       = os.environ.get("VOXTRAL_MODEL", "voxtral-mini-latest")
+# Hoeveel user+anna-beurten houden we als context voor Mistral? 2 = laatste
+# user-vraag + laatste anna-antwoord. Meer = Anna onthoudt teveel en
+# raakt afgeleid. Reset bij slaap.
+HISTORY_TURNS       = int(os.environ.get("HISTORY_TURNS", "2"))
 
 PIPER_BIN           = os.environ.get("PIPER_BIN", "")
 PIPER_VOICE         = os.environ.get("PIPER_VOICE", "")
@@ -523,18 +527,34 @@ def _transcribe_voxtral(audio_f32: "np.ndarray") -> str | None:
     return (j.get("text") or "").strip() or None
 
 
+# Beperkt conversatie-geheugen: laatste HISTORY_TURNS user+assistant berichten.
+# Niet alles onthouden (Anna raakt dan "vast" in oude lijnen). Reset bij slaap.
+_RECENT_TURNS: "deque[dict]" = deque(maxlen=HISTORY_TURNS * 2)
+
+
+def remember_turn(user_text: str, anna_text: str) -> None:
+    if user_text:
+        _RECENT_TURNS.append({"role": "user", "content": user_text})
+    if anna_text and anna_text.strip() not in ("", "[STIL]"):
+        _RECENT_TURNS.append({"role": "assistant", "content": anna_text})
+
+
+def forget_conversation() -> None:
+    _RECENT_TURNS.clear()
+
+
 def _stream_cloud(user_text: str, sys_prompt: str):
     if not MISTRAL_API_KEY:
         raise RuntimeError("MISTRAL_API_KEY leeg")
+    msgs = [{"role": "system", "content": sys_prompt}]
+    msgs.extend(list(_RECENT_TURNS))
+    msgs.append({"role": "user", "content": user_text})
     r = requests.post(
         "https://api.mistral.ai/v1/chat/completions",
         headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
         json={
             "model": MISTRAL_MODEL,
-            "messages": [
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_text},
-            ],
+            "messages": msgs,
             "temperature": 0.8,
             "max_tokens": 160,
             "stream": True,
@@ -559,14 +579,14 @@ def _stream_cloud(user_text: str, sys_prompt: str):
 
 
 def _stream_local(user_text: str, sys_prompt: str):
+    msgs = [{"role": "system", "content": sys_prompt}]
+    msgs.extend(list(_RECENT_TURNS))
+    msgs.append({"role": "user", "content": user_text})
     r = requests.post(
         f"{OLLAMA_HOST}/api/chat",
         json={
             "model": OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_text},
-            ],
+            "messages": msgs,
             "stream": True,
             "options": {"temperature": 0.8, "num_predict": 120},
         },
@@ -1024,6 +1044,7 @@ def main() -> int:
                 had_real_gesprek = False
                 set_state("sluimert")
                 last_ambient = time.monotonic()  # reset ambient na afscheid
+                forget_conversation()
             continue
 
         if not is_awake:
@@ -1055,6 +1076,7 @@ def main() -> int:
                 say(SLEEP_ACK)
             is_awake = False
             set_state("sluimert")
+            forget_conversation()
             continue
 
         if not from_speak_place():
@@ -1113,6 +1135,7 @@ def main() -> int:
 
         if answer_full:
             log_fragment(answer_full, "anna")
+            remember_turn(heard, answer_full)
 
         set_state("luistert")
         last_activity = time.monotonic()
