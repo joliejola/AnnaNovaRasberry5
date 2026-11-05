@@ -6,33 +6,47 @@
 
 ---
 
-## De 5 Jolanda-beslismomenten
+## De 7 Jolanda-beslismomenten
 
-Deze 5 zijn de enige dingen waar jij aan het stuur zit — de rest doe ik:
+Deze 7 zijn de enige dingen waar jij aan het stuur zit — de rest doe ik:
 
 | # | moment | hoe lang | wat ik je vraag |
 |---|--------|---------|------------|
-| 1 | **stem kiezen** | 5 min | 3 stem-samples afgespeeld, jij kiest 1 |
-| 2 | **persona-stem OK?** | 5 min | ik speel 5 Anna-antwoorden af, jij zegt "ja/nee/zuurder/zachter" |
-| 3 | **foto-filter OK?** | 5 min | 4 foto-filter voorbeelden, jij kiest 1 |
-| 4 | **go/no-go galerij publiek** | 5 min | screenshot van site, jij zegt "publiceer" of "niet nog" |
-| 5 | **final expositie-go** | 5 min | demo-gesprek, jij zegt "klaar" of "nog X aanpassen" |
+| 1 | **UI-stadia review** | 10 min | 4 screenshots per state, samen bekijken wat duidelijker moet |
+| 2 | **stem kiezen** | 5 min | 3 stem-samples afgespeeld, jij kiest 1 |
+| 3 | **gesprek-arc design** | 15 min | Ik laat 3 gesprek-flows horen (open/midden/afscheid), jij schrijft voor hoe het moet klinken |
+| 4 | **persona-tone OK?** | 5 min | ik speel 5 Anna-antwoorden af, jij zegt "ja/nee/zuurder/zachter" |
+| 5 | **foto-filter kiezen** | 5 min | 4 foto-filter voorbeelden, jij kiest 1 |
+| 6 | **galerij publiek OK?** | 5 min | screenshot van site, jij zegt "publiceer" of "niet nog" |
+| 7 | **final expositie-go** | 5 min | demo-gesprek, jij zegt "klaar" of "nog X aanpassen" |
 
-Totaal 25 min van jouw tijd aan beslissingen. De rest is uitvoering.
+Totaal ~50 min van jouw tijd aan beslissingen, verdeeld over de dag. De rest is uitvoering.
 
 ---
 
-## Must-haves voor "expositie-klaar"
+## Must-haves voor "expositie-klaar" — in volgorde van KRITIEK
 
-1. ✅ Reactietijd gevoelsmatig < 5 sec per beurt
-2. ✅ Anna antwoordt altijd — nooit volledig stil
-3. ✅ Antwoorden voelen levend (niet ChatGPT, niet robot)
-4. ✅ Gesprek-geheugen 2 beurten: Anna refereert aan wat je net zei
-5. ✅ Slaap/wake-overgangen clean: scherm leegt bij slaap
-6. ✅ Chromium opent automatisch bij Pi-reboot
-7. ✅ Foto's op publieke galerij zijn AVG-safe (onherkenbaar)
-8. ✅ Foto's niet vaker dan 1 per 10 min
-9. ✅ Camera werkt (Anna ziet bezoeker, zie je terug in debug)
+**TOP-6** (deze zijn de expositie zelf — ontbreekt er één, dan is Anna niet "af"):
+
+1. 🔥 **Visueel duidelijke stadia** — bezoeker ziet in 1 oogopslag of Anna slaapt/luistert/denkt/vertelt en wéét wat te doen
+2. 🔥 **Gesprek-design: opening → midden → afsluiting** — Anna heeft een duidelijke arc per gesprek, niet 5 losse antwoorden. Welkom-moment, verdieping, afscheid.
+3. 🔥 **Wake-woord werkt elke keer** — "Hoi Anna Nova" wekt haar in 95%+ van de pogingen
+4. 🔥 **Stem klinkt natuurlijk + prettig** — eerste 3 sec beslissen of de bezoeker blijft
+5. 🔥 **Antwoorden voelen levend + snel** (<5 sec, stelt vraag terug, nooit volledig stil)
+6. 🔥 **Externe foto-galerij publiek + AVG-safe** — ONDERDEEL VAN HET WERK. Toont wat AI "zag". Foto's onherkenbaar maar herkenbare sfeer. Rate-limit 1 per 10 min zodat galerij leesbaar blijft.
+
+**BELANGRIJK maar niet expositie-makend**:
+
+6. Slaap/wake-overgangen clean (scherm leegt bij slaap, geen spookzinnen)
+7. Chromium autostart bij Pi-reboot
+8. Antwoord-lengte: niet te lang, niet "Hm."
+9. Camera werkt (nodig voor foto's — zonder camera werkt galerij niet)
+
+**Als tijd** (nice-to-have):
+
+10. Gesprek-geheugen over 2 beurten
+11. Voice-recognition (jou herkennen)
+12. USB wifi-dongel (snelheids-boost)
 
 ---
 
@@ -55,7 +69,31 @@ Ik check alle 14 items uit retest-lijst, rapporteer in chat:
 
 ---
 
-## FASE 2 — Camera aansluiten (jij, 15 min) | 09:15
+## FASE 2 — UI-stadia samen herzien | 25 min | 09:15 🔔
+
+**Doel**: bezoeker ziet in 1 oogopslag wat te doen.
+
+**Ik doe**: forceer Anna in elke state en maak 4 screenshots (sluimert/luistert/denkt/spreekt). Toon ze in een 2×2 grid in chat met korte uitleg per state.
+
+**🔔 BESLISMOMENT 1 — Jij bekijkt**:
+- Is "slapen → wake me" duidelijk? (bezoeker moet weten: ik moet iets zeggen)
+- Is "luistert → praat nu" duidelijk?
+- Is "denkt → wacht" duidelijk?
+- Is "spreekt → luister" duidelijk?
+
+**Ik implementeer jouw aanwijzingen**, bijv.:
+- Grote tekst midden-scherm per state: "wekker mij" / "ik luister" / "ik denk" / "ik vertel"
+- Kleuren per state nog harder uit elkaar
+- Subtiele icoon per state (zz/oor/brein/mond)
+- Grotere/zachtere animaties als extra cue
+
+Commit+pull+herscreenshot → nog 1 ronde review → akkoord.
+
+**Afvinkregel**: jij zegt "zo is het duidelijk".
+
+---
+
+## FASE 3 — Camera aansluiten (jij fysiek, 15 min) | 09:40
 
 **Alleen fysiek deel is voor jou**: kabel in de Pi en camera. Lees blok 2 van gisteren. Zodra je klaar bent, zeg je het en ik draai alle camera-tests + rapport.
 
@@ -63,7 +101,7 @@ Ik check alle 14 items uit retest-lijst, rapporteer in chat:
 
 ---
 
-## FASE 3 — Stem-vergelijking (ik + jij, 15 min) | 09:35
+## FASE 4 — Stem-vergelijking (ik + jij, 15 min) | 09:55 🔔
 
 **Ik doe**: 3 stemmen downloaden (nathalie-medium, mls_5809-low, rdh-medium), speel elk af met zin "Hoi, ik ben Anna Nova. Wat brengt je hier?" op een SSH-call.
 
@@ -75,7 +113,32 @@ Ik commit die keuze in .env + persona.md. Als geen van 3 goed is → ik stel Ele
 
 ---
 
-## FASE 4 — Conversatie-selftest ronde 1 (ik, 20 min) | 09:50
+## FASE 4b — Gesprek-arc design (ik + jij, 25 min) | 10:10 🔔
+
+**Doel**: Anna heeft per gesprek een duidelijke arc, niet 5 losse beurten.
+
+**Ik draai**: 3 simulatie-gesprekken van 6 beurten elk, log de volledige transcriptie.
+
+**Ik laat je per gesprek zien**:
+- Hoe begint Anna? (welkom-moment, haakje)
+- Hoe verdiept het gesprek? (gaat ze dieper? vraagt door? herinnert ze aan zichzelf?)
+- Hoe eindigt het? (afscheid, na slaap-commando of auto-timeout)
+
+**🔔 BESLISMOMENT 3 — Jij ontwerpt mee**:
+- **Opening**: moet Anna een vaste openingszin hebben? (bv. altijd eerst *"Hm, wie ben jij?"*)
+- **Middenstuk**: wanneer verdiept ze? Na 2 beurten? Pas als bezoeker iets persoonlijks zegt?
+- **Afscheid**: wat is de ideale afsluiting? (plechtig? grappig? kort?)
+- **Grace-moment**: als een gesprek doodloopt (lange stilte) — wat zegt Anna dan?
+- **Her-engagement**: als bezoeker aarzelt — hoe trekt Anna hen weer binnen?
+
+**Ik implementeer** jouw antwoorden in persona.md (nieuwe sectie "Gesprek-arc"). Commit+pull.
+Daarna 2e ronde simulatie — ik stuur nieuwe transcriptie, jij zegt of de arc nu voelt.
+
+**Afvinkregel**: 3 simulatie-gesprekken hebben een voelbaar begin, midden en eind.
+
+---
+
+## FASE 5 — Conversatie-selftest ronde 1 (ik, 20 min) | 10:35
 
 **Ik draai**: `anna-selftest-conversation.sh` — 15 gescripte beurten die het hele persona-palet aftasten:
 - 3 korte vragen (kleur, naam, leeftijd)
