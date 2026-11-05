@@ -648,19 +648,36 @@ def _normalize(s: str) -> str:
     return s
 
 def wake_match(transcript: str, phrase: str = WAKE_PHRASE) -> bool:
-    """Fuzzy match: 'hoi anna nova', 'hoi anna', 'hallo anna nova', 'anna nova' etc.
+    """Fuzzy match voor 'Hoi Anna Nova' en mishoorde varianten.
 
-    Vereist dat ten minste 'anna' + ('nova' of een groet) voorkomt."""
+    Whisper-small verwart 'Anna' regelmatig met 'ooyama', 'ohana', 'hannah',
+    'hannover', 'hanna', 'yama', etc. 'Nova' is relatief uniek, dus als dat
+    voorkomt in combinatie met een greeting of met een anna-achtig woord is
+    het heel waarschijnlijk de wake-phrase."""
     t = _normalize(transcript)
     want = _normalize(phrase)
     # Exacte substring: altijd goed
     if want in t:
         return True
-    # Soepel: 'anna' moet erin, en 'nova' of een duidelijke groet
-    groet_hits = any(g in t for g in ("hoi", "hallo", "hey", "hé", "dag", "goedemiddag", "goedemorgen", "goedenavond"))
-    heeft_anna = "anna" in t
+    tokens = t.split()
+    if not tokens:
+        return False
+    groet_hits = any(g in tokens for g in (
+        "hoi", "hallo", "hey", "he", "hee", "dag", "oh", "ha",
+        "goedemiddag", "goedemorgen", "goedenavond",
+    ))
     heeft_nova = "nova" in t
-    return heeft_anna and (heeft_nova or groet_hits)
+    # Anna-achtige woorden die Whisper regelmatig produceert:
+    anna_like = ("anna", "ana", "hanna", "ohana", "ohanna", "yama",
+                 "ooyama", "hannah", "hanover", "hannover", "nana")
+    heeft_anna_like = any(w in t for w in anna_like)
+    # 'nova' is zo'n uniek woord dat een greeting ervoor + 'nova' voldoende is
+    if heeft_nova and (heeft_anna_like or groet_hits):
+        return True
+    # Of klassiek: echte 'anna' + (nova of groet)
+    if "anna" in t and (heeft_nova or groet_hits):
+        return True
+    return False
 
 
 def sleep_match(transcript: str) -> bool:

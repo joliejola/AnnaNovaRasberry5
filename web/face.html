@@ -287,15 +287,27 @@
       badge.classList.add("state-" + s);
       stateText.textContent = s;
 
-      // Hint rechtsonder: wissel per staat
+      // Hint rechtsonder: wissel per staat, maar in sluimer toon ook wat ze NET hoorde
       const hint = document.getElementById("hint");
-      hint.textContent = {
+      let hintText = {
         sluimert: 'zeg "hoi anna nova"',
-        luistert: "ze luistert",
-        denkt:    "",
-        spreekt:  "",
+        luistert: "ze luistert…",
+        denkt:    "ze denkt…",
+        spreekt:  "ze spreekt…",
         offline:  "verbinding verbroken"
       }[s] || "";
+      // Als sluimer EN laatste debug event was een "skip" (= hoorde iets maar geen wake),
+      // toon dat zodat Jolanda ziet dat de mic wél werkt
+      if (s === "sluimert" && debugItems.length) {
+        for (let i = debugItems.length - 1; i >= Math.max(0, debugItems.length - 5); i--) {
+          const e = debugItems[i];
+          if (e.kind === "skip" || e.kind === "wake" || e.kind === "visitor") {
+            hintText = "gehoord: " + e.msg.replace(/^.*?"/, '"').replace(/^genegeerd \(geen wake\): /, "");
+            break;
+          }
+        }
+      }
+      hint.textContent = hintText;
 
       // Denk-indicator
       document.getElementById("thinking").classList.toggle("on", s === "denkt");
