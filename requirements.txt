@@ -1,0 +1,26 @@
+# Anna Nova bouwplan v2 — Python dependencies
+#
+# Lokaal (laptop / mac) voor droogloop + render_audio:
+#   pip install Pillow requests piper-tts
+#
+# Op Pi (install.sh doet dit):
+#   pip install Pillow requests piper-tts sounddevice silero-vad scipy numpy \
+#               faster-whisper
+#
+# Hardware-specifieke pakketten (Pi only):
+#   - picamera2    → via apt (python3-picamera2)
+#   - python-escpos (optioneel, printer-fallback)
+#   - vosk         (offline wake, bouwstap 7) + model nl-small
+
+Pillow>=10.0
+requests>=2.31
+piper-tts>=1.8
+
+# live-mode (bouwstap 7):
+sounddevice>=0.4
+silero-vad>=5.0
+scipy>=1.11
+numpy>=1.26
+
+# ASR-fallback als voxtral niet lukt:
+faster-whisper>=1.0
