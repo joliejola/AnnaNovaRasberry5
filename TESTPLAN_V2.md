@@ -1,10 +1,15 @@
 # Testplan v2 — Anna Nova (bouwplan v2)
 
 *6 november 2026 · vervangt `TESTPLAN_MORGEN.md` en `CONVERSATIE_TESTPLAN.md`*
+*Revisie na Jolanda's feedback 6 nov ochtend: wake-phrase en sleep-phrases blijven; printer-tests pas vanmiddag.*
 
 Per bouwstap uit `BOUWPLAN_V2_AANPAK.md`: de test die Jolanda zelf uitvoert of meeleest, plus baseline-timings en een end-to-end simulatie. Zie `docs/BOUWPLAN_BRON.md` voor het bronplan.
 
 **Principe van dit testplan**: we testen de machine, niet de kunst. Of het kunstwerk "werkt" — dat beslist Jolanda bij beslismoment 3 en 9. Deze tests zeggen alleen of alles draait.
+
+## Volgorde vandaag
+
+Tests worden niet in bron-2-volgorde doorlopen. Ochtend (zonder printer): bouwstap 2, 4, 5, 7 (wake/sleep-deel), 8-prep. Middag (printer binnen): bouwstap 1, 3, 6, 7 (camera/plek-deel), 8, 9, 10.
 
 ---
 
@@ -19,7 +24,7 @@ Elke bouwstap heeft:
 
 ---
 
-## Bouwstap 1 — Printertje aan de praat
+## Bouwstap 1 — Printertje aan de praat *(na lunch, als printer binnen is)*
 
 **Doel**: Bluetooth-printer koppelt met Pi, print 1 regel tekst, we weten print-breedte in pixels.
 
@@ -106,20 +111,24 @@ Elke bouwstap heeft:
 
 ---
 
-## Bouwstap 4 — `flow.py` droogloop: 5 gesprekken
+## Bouwstap 4 — `flow.py` droogloop: 5 gesprekken (met wake + sleep)
 
-**Doel**: Gespreksmachine draait zonder hardware. Alle toestanden bereikbaar. Tellers werken.
+**Doel**: Gespreksmachine draait zonder hardware. Alle toestanden bereikbaar. Tellers werken. Wake-phrase en sleep-phrase werken.
 
 **Wie**: Jolanda zelf (typt antwoorden), ik kijk mee.
 
-**Wat voor Jolanda zichtbaar**: terminal op laptop. Anna "spreekt" via `print()`. Jolanda antwoordt via `input()`. State verandert zichtbaar links in console.
+**Wat voor Jolanda zichtbaar**: terminal op laptop. Anna "spreekt" via `print()`. Jolanda antwoordt via `input()`. State verandert zichtbaar links in console. Elke gesprek begint vanuit RUST — Jolanda moet dus eerst "Hoi Anna Nova" typen om wakker te maken.
 
 ### De 5 testgesprekken
 
-**Gesprek A — rechte lijn** (alles netjes):
+**Gesprek A — rechte lijn** (alles netjes, met wake):
 ```
-> [flow start]
-[RUST → OPENING] Anna: Hé. Je stond er wat lang bij.
+> [flow start, state: RUST]
+[RUST] (Anna slaapt, lokzin af en toe)
+Jolanda: hoi anna nova
+[hear.wake_detected: "hoi anna nova"]
+[RUST → OPENING] Anna: Hm.
+[OPENING] Anna: Hé. Je stond er wat lang bij.
 [VRAAG] Anna: Voel jij je hier bekeken?
 Jolanda: Ja, een beetje. Alsof je echt kijkt.
 [REAGEREN→VRAAG] Anna: Logisch. Gaat de camera uit als je vertrekt?
@@ -129,8 +138,9 @@ Jolanda: Geen idee eigenlijk.
 [AFSLUITING] Anna: Wil je de rekening?
 Jolanda: Ja.
 [BON → LOSLATEN] (PNG opgeslagen in /tmp/bon_droogloop_*.png)
+[RUST]
 ```
-**Pass**: Jolanda ziet alle 4 vragen voorbij komen. 1 bekeken (licht:true), 1 bewaard, 1 wrijving, 1 vrij.
+**Pass**: Jolanda ziet alle 4 vragen voorbij komen. 1 bekeken (licht:true), 1 bewaard, 1 wrijving, 1 vrij. Wake-ack kort ("Hm." of vergelijkbaar).
 
 **Gesprek B — zijweg (max 2 toegestaan)**:
 Jolanda zegt bij vraag 2: "Ik heb hier niks mee te maken, ik kwam voor het atelier."
@@ -153,15 +163,47 @@ Verwacht: Anna gaat door naar volgende vraag.
 **Pass**: ruis-situatie werkt, teller werkt.
 
 **Gesprek E — nee op afrekening**:
-Jolanda doet volledig gesprek maar bij "Wil je de rekening?" zegt ze: "Nee, liever niet."
+Jolanda doet volledig gesprek (begin met wake), maar bij "Wil je de rekening?" zegt ze: "Nee, liever niet."
 Verwacht: `na_nee`-zin, geen bon, LOSLATEN.
 **Pass**: geen bon geprint, Anna zegt iets zoals "Prima. Tot ziens dan."
+
+**Gesprek F — sleep-phrase mid-gesprek** (Jolanda-noodrem):
+Jolanda doet wake + opening + 2 vragen, dan typt bij vraag 3: "slaap lekker"
+Verwacht: `hear.sleep_detected` → SLEEP_ACK ("Mmh. Welterusten.") → LOSLATEN → RUST. Geen bon.
+**Pass**: Anna stil binnen 2 "simulatie-seconden". Nieuwe wake-phrase werkt daarna.
 
 ### Extra tellers
 
 - [ ] 5 min-timer: bij 5 min auto AFSLUITING
 - [ ] 6s leeg plek (`#weg` typen): LOSLATEN zonder bon
 - [ ] DRUK (`#druk`): wacht 10s, dan knopmodus-tekst
+
+### Wake-phrase varianten in droogloop
+
+Jolanda typt de volgende en checkt of elke een wake triggert:
+- [ ] `hoi anna nova` (standaard)
+- [ ] `hallo anna nova`
+- [ ] `hoi anna` (verkort)
+- [ ] `anna nova` (geen begroeting)
+- [ ] `hoi anna hoe gaat het` (wake + extra)
+- [ ] `oké anna nova` (variatie)
+- [ ] `hey anna nova` (anglicisme)
+- [ ] (willekeurige zin zonder "anna"): NIET wakker
+
+**Pass**: 7 van 8 wake-pogingen slagen; de zonder-anna niet.
+
+### Sleep-phrase varianten in droogloop
+
+Vanuit LUISTEREN, Jolanda typt:
+- [ ] `slaap lekker` → LOSLATEN
+- [ ] `ga maar slapen` → LOSLATEN
+- [ ] `welterusten` → LOSLATEN
+- [ ] `stil nu` → LOSLATEN
+- [ ] `dag anna` → LOSLATEN
+- [ ] `anna slapen` → LOSLATEN
+- [ ] `vertel me wat over slapen` → NIET LOSLATEN (over-strict fuzzy probleem)
+
+**Pass**: 6 van 7 triggers juist, de contextuele niet.
 
 **🔔 Beslismoment 3** — Jolanda beslist (het belangrijkste beslismoment van de dag):
 - Voelen brugzinnen natuurlijk?
@@ -253,27 +295,70 @@ Jolanda hoort via laptopspeaker (of Pi-speaker via SSH):
 
 ---
 
-## Bouwstap 7 — hear.py + see.py aan flow koppelen
+## Bouwstap 7 — hear.py + see.py + wake/sleep aan flow koppelen
 
-**Doel**: Alleen stem van iemand op spreekplek telt. Groep ernaast telt niet. Knopmodus werkt.
+**Doel**: wake-phrase wekt Anna; sleep-phrase laat haar stil; stem van iemand op spreekplek telt in LUISTEREN, groep ernaast niet. Knopmodus werkt.
 
 **Wie**: Jolanda fysiek + ik via SSH.
 
-### Test 7a — spreekplek-detectie
+### Test 7a — wake-phrase op echte mic (ochtend, voor camera+DoA-tuning)
+
+Dit deel kan **vóór de printer binnenkomt** — alleen mic en Pi nodig. Het kan al om 10:00.
+
+Jolanda staat op 1m voor de Pi (ongeveer bij spreekplek):
+
+| # | Ze zegt | Verwacht |
+|---|---|---|
+| 1 | "Hoi Anna Nova" | WAKE → OPENING binnen 3s (Voxtral ~1s + match ~0.1s + OPENING-audio) |
+| 2 | "Hallo Anna Nova" | WAKE → OPENING |
+| 3 | "Hoi Anna" | WAKE → OPENING |
+| 4 | "Anna Nova?" | WAKE → OPENING |
+| 5 | "Oké Anna Nova" | WAKE → OPENING |
+| 6 | "Hoi Anneke" | NIET wakker (naam is niet Anna Nova) |
+| 7 | "Praat je Anna Nova?" | WAKE → OPENING (bevat de naam) |
+| 8 | "Vandaag was het mooi weer" | NIET wakker |
+| 9 | (fluistert) "hoi anna nova" | WAKE of niet — VAD-drempel vraag |
+| 10 | "hoi anna nova" (op 3m afstand) | Mogelijk wakker, mogelijk niet — hoor-radius vraag |
+
+**Pass voor expositie-klaar**:
+- [ ] 5 van 7 "moet wakker" wakker gemaakt (ruim genoeg)
+- [ ] 0 van 2 "niet wakker" wakker gemaakt (geen false-positive)
+- [ ] Wake-ack klinkt binnen 3s na uitspraak
+
+Note Jolanda-kennis: meerdere mensen in de ruimte die niet voor Anna staan — zeggen die Anna's naam terwijl ze over haar praten → **zie 7b voor DRUK-test met Anna's naam in background chatter**.
+
+### Test 7b — sleep-phrase mid-gesprek
+
+Jolanda doet wake + opening + 1 vraag-antwoord. Dan bij "VRAAG 2" zegt ze: "Slaap lekker."
+Verwacht:
+- Binnen 2s: Anna zegt SLEEP_ACK ("Mmh. Welterusten." of korter)
+- Scherm: → RUST-state (rood pulserend dicht)
+- Bon NIET geprint
+
+Daarna: Jolanda zegt binnen 10s "Hoi Anna Nova" → wake werkt gewoon weer.
+
+**Pass**:
+- [ ] Sleep triggert binnen 2s
+- [ ] Geen bon
+- [ ] Wake werkt opnieuw na sleep
+
+### Test 7c — spreekplek-detectie (DoA + camera)
+
+**Vereist camera + ReSpeaker.** Kan pas als camera gekalibreerd is. Bij voorkeur na lunch samen met printer-integratie.
 
 Jolanda gaat recht voor de Pi staan (op spreekplek, ~1m voor camera):
-1. Zegt: "Hoor je mij?"
-2. Verwacht: Anna gaat RUST → OPENING binnen 2s
+1. Doet wake ("Hoi Anna Nova")
+2. Verwacht: Anna gaat RUST → OPENING binnen 3s
 
 Jolanda stapt zijwaarts 60cm (uit de ±30° zone):
 3. Zegt: "Hoor je mij nog?"
 4. Verwacht: Anna reageert niet of STIL-toestand (DoA ziet spreker, maar see.py zegt niet op plek).
 
 **Pass**:
-- [ ] Op plek → trigger binnen 2s
-- [ ] Naast plek → geen trigger, blijft RUST
+- [ ] Op plek + wake → trigger binnen 3s
+- [ ] Naast plek na wake → Anna hoort je niet (STIL-timer loopt)
 
-### Test 7b — camera detecteert aantal personen
+### Test 7d — camera detecteert aantal personen
 
 Jolanda op plek, Bodil 2m naast haar.
 1. Verwacht: `see.py` zegt "1 persoon op plek, 1 elders" → normale LUISTEREN
@@ -285,7 +370,21 @@ Jolanda op plek, Bodil 2m naast haar.
 - [ ] DRUK triggert binnen 10s
 - [ ] Knopmodus zichtbaar op scherm
 
-### Test 7c — knopmodus
+### Test 7e — wake-phrase in rumoer (background chatter met "Anna")
+
+Jolanda + 2 vrienden in atelier. Niemand op plek. Een van de vrienden zegt "Oh, ik las iets over Anna gisteren".
+
+**Verwacht**:
+- Anna detecteert wake maar `see.py` zegt "niemand op plek" → Anna zegt alleen WAKE_ACK, blijft in half-wakker-staat (RUST + 5s timeout).
+- Als binnen 5s niemand op plek stapt → terug naar RUST, geen OPENING.
+- Als iemand snel op plek stapt binnen 5s → OPENING alsnog (bruikbaar nevenresultaat).
+
+**Pass**:
+- [ ] Anna slaat niet uit in volledige OPENING bij pure background-mention
+- [ ] WAKE_ACK is kort genoeg (max 1.5s audio) dat het niet storend klinkt in de ruimte
+- [ ] Als dat toch gebeurt → dit beslismoment 6: aanpassen gevoeligheid (woord "anna nova" strenger, bijv. required substring "nova")
+
+### Test 7f — knopmodus
 
 USB-knop ingedrukt houden:
 1. Jolanda zegt iets terwijl knop ingedrukt
@@ -302,10 +401,14 @@ USB-knop ingedrukt houden:
 
 **🔔 Beslismoment 6**:
 - Spreekplek-marge 30° goed?
+- Wake-fuzzy ruim of strak? (bron 1 "hoi anna" accepteerde ook short-form; test 7e kan dwingen dat `nova` verplicht is)
 - Hoe gevoelig is de camera voor "op plek" — strenger of soepeler?
+- Sleep-ack bevestiging ("Mmh. Welterusten.") of helemaal stil?
 
 **Fail-pad**:
-- Te veel vals-positief (reageert op mensen ernaast): marge naar 20°
+- Wake te false-positive in rumoer: eis exacte substring `anna nova` (geen `anna` solo)
+- Wake te false-negative: lagere edit-distance drempel
+- Te veel vals-positief (reageert op mensen ernaast tijdens LUISTEREN): marge naar 20°
 - Te veel gemist (reageert niet terwijl spreker op plek): marge naar 45°
 - Camera pixeldetectie faalt: gebruik alleen DoA (minder streng maar werkend)
 
@@ -313,6 +416,7 @@ USB-knop ingedrukt houden:
 - DoA-respons: < 500ms
 - Face-count refresh: 2 Hz
 - VAD-chunk: 128ms (uit oude code, CPU-friendly)
+- Wake-detect-latency: < 2s (VAD-chunk + Voxtral upload + match)
 
 ---
 
@@ -449,9 +553,10 @@ Dit is de reality-check voor bouwstap 4, maar nu volledig gelogd.
 ```
 $ DROOGLOOP=1 python3 -m anna.main
 
-[12:34:00] [RUST]
-[12:34:02] [see] 1 persoon op plek — triggered
-[12:34:02] [OPENING] "Hé. Je stond er wat lang bij." (audio/o1.wav, 2.1s)
+[12:34:00] [RUST] (lokzin af en toe)
+[12:34:02] [hear] "hoi anna nova" → wake_detected
+[12:34:02] [WAKE_ACK] "Hm." (audio/wake_ack.wav, 0.4s)
+[12:34:03] [OPENING] "Hé. Je stond er wat lang bij." (audio/o1.wav, 2.1s)
 [12:34:04] [VRAAG] "Voel jij je hier bekeken?" (audio/v1.wav, 1.8s, halte=bekeken)
 [12:34:06] [LUISTEREN] ...
 [12:34:12] [hear] "Ja, een beetje."
@@ -477,28 +582,33 @@ Memory peak: 340 MB
 ```
 
 **Baseline-timings (acceptable)**:
+- Wake-detect tot WAKE_ACK: < 2s
 - Mistral-call gemiddeld: < 2s
 - Voxtral-TTS live gemiddeld: < 2s
 - Totaal gesprek: tussen 2m30s en 4m
 - Mistral + Voxtral in één turn: < 4s (anders brugzin)
+- Sleep-phrase heard → RUST: < 2s
 
 ---
 
 ## Hardware-integratietest (einde dag, bouwstap 10d)
 
 **Alles samen, 1u continu**:
-- Spreekplek, printer, scherm, Mistral, Voxtral, Piper allemaal aan.
+- Wake-phrase + sleep-phrase, spreekplek, printer, scherm, Mistral, Voxtral, Piper allemaal aan.
 - Jolanda, Bodil, en 3 vrienden lopen vrij in/uit atelier.
 - Anna doet 10 gesprekken (sommige afgebroken, sommige compleet).
 - Ik log elk gesprek: duur, aantal beurten, bon-geprint?, errors.
 
 **Target voor expositie-klaar**:
 - [ ] 10/10 gesprekken zonder crash
-- [ ] 7/10 gesprekken eindigen natuurlijk (OPENING → 4 vragen → AFSLUITING)
+- [ ] 7/10 gesprekken eindigen natuurlijk (wake → OPENING → 4 vragen → AFSLUITING)
 - [ ] ≥ 5 bonnen geprint
+- [ ] Jolanda test ≥ 1x sleep-phrase mid-gesprek — Anna stopt direct
+- [ ] 0 "spook-wakes" (wake-trigger terwijl niemand voor Anna staat én niemand haar naam zei)
 - [ ] Transcript **niet** op schijf na 1u (check: `find / -name '*anna*transcript*' -mtime -1`)
 - [ ] CPU gemiddeld < 60% (als >80% constant: verwacht drops in audio)
 - [ ] RAM < 2 GB (Pi 5 heeft 8 GB, dus zeeën van ruimte)
+- [ ] Foto-pijplijn-code aanwezig maar NIET actief (`ps aux | grep anna-sync` leeg; `systemctl status anna-nova` meldt geen photo-thread)
 
 Als meer dan 2 gesprekken crashen: **niet expositie-klaar**. Fix urgent of val terug op `main`.
 

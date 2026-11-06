@@ -1,10 +1,17 @@
 # Bouwplan v2 — aanpak voor Anna Nova (praatcel met bon)
 
-*6 november 2026 · vervangt `MORGEN_AANPAK.md`*
+*6 november 2026 · vervangt `MORGEN_AANPAK.md`, revisie na Jolanda's feedback 6 nov ochtend*
 
-Jolanda schreef in de nacht van 5→6 november een nieuw bouwplan (zie `docs/BOUWPLAN_BRON.md`). Dat herdefinieert het kunstwerk wezenlijk: geen galerij, geen foto's — een gespreksmachine van ~3 minuten die eindigt met een bon uit een klein Bluetooth-printertje. Dit document is **onderhevig aan bron 2**. Waar iets botst: bron 2 wint.
+Jolanda schreef in de nacht van 5→6 november een nieuw bouwplan (zie `docs/BOUWPLAN_BRON.md`). Dat herdefinieert het kunstwerk wezenlijk: geen galerij, geen foto's — een gespreksmachine van ~3 minuten die eindigt met een bon uit een klein Bluetooth-printertje. Dit document is **onderhevig aan bron 2**. Waar iets botst: bron 2 wint, behalve waar Jolanda expliciet een afwijking vraagt (zie revisie-notitie onderaan).
 
-Dit document is voor vandaag. Het zegt (1) wat uit het oude plan blijft, (2) wat weggaat, (3) hoe we de 10 bouwstappen uit bron 2 in parallelle tracks verdelen, en (4) waar Jolanda een beslissing maakt.
+Dit document is voor vandaag. Het zegt (1) wat uit het oude plan blijft, (2) wat weggaat, (3) wat bewust blijft bestaan maar niet gebruikt wordt, (4) hoe we de 10 bouwstappen uit bron 2 in parallelle tracks verdelen, en (5) waar Jolanda een beslissing maakt.
+
+## Revisie 6 nov ochtend — door Jolanda
+
+- **Wake-phrase blijft primaire trigger**. Reden: expositie met veel mensen → Anna mag niet zomaar aanslaan, moet eerst aangesproken worden ("Hoi Anna Nova" + alle fuzzy varianten).
+- **SLEEP_PHRASES blijven** ("slaap lekker", "ga maar slapen", etc.). Reden: Jolanda moet Anna midden-expositie kunnen laten zwijgen zonder stekker eruit.
+- **Foto-pijplijn**: niet slopen uit codebase. Laten staan in `vision.py` / `anna-sync.py` / `web/gallery.html`. Niet doorontwikkelen, niet opstarten in service, mogelijk later weer actief.
+- **Printer + USB wifi-dongel komen pas vanmiddag**. Volgorde omgedraaid: offline- en Pi-werk eerst, hardware-integratie na lunch.
 
 ---
 
@@ -29,8 +36,10 @@ Deze stukken zijn werkend fundament uit de afgelopen week. Niet weggooien — ma
 | Mistral http-client (EU endpoint, API-key, timeout-pattern) | `anna/brain.py` — basis | Werkt al; alleen de prompt + JSON-output zijn nieuw |
 | ReSpeaker DoA (`respeaker_doa.py`) | `anna/see.py` of apart `anna/hear.py` — richtingsbepaling | Werkt al, is kern van spreekplek-detectie |
 | VAD-throttle (silero_vad elke 128ms ipv 32ms) | `anna/hear.py` — stilte-detectie in LUISTEREN | CPU-fix 140%→20%, cruciaal voor Pi |
-| `reset_session_window()` + forget-logica bij slaap/wake | `anna/flow.py` — LOSLATEN-toestand | Dezelfde logica, andere trigger (6s plek leeg of BON afgerond ipv slaap-commando) |
-| Ruimere wake-match (fuzzy substring) | **Wordt niet meer gebruikt als wake-woord.** Fragmenten kunnen wel naar `anna/flow.py` voor knopmodus-detectie of DRUK-triage | Nieuwe trigger is spreekplek, niet woord |
+| `reset_session_window()` + forget-logica bij slaap/wake | `anna/flow.py` — LOSLATEN-toestand | Dezelfde logica, meerdere triggers (6s plek leeg, BON afgerond, of SLEEP_PHRASE) |
+| **Wake-phrase ("Hoi Anna Nova" + fuzzy varianten)** | `anna/hear.py` — primaire RUST→OPENING trigger. Spreekplek-detectie blijft, maar als filter bij LUISTEREN (wie van de omstanders telt), niet om Anna wakker te maken | Veel mensen op expositie → Anna mag niet zomaar aanslaan. Behoudt variants uit huidige `.env` `WAKE_PHRASE` |
+| **SLEEP_PHRASES** (`slaap lekker`, `ga maar slapen`, `welterusten`, etc.) | `anna/hear.py` — werkt in elke actieve toestand (OPENING/VRAAG/LUISTEREN/REAGEREN). Triggert direct LOSLATEN → RUST. Geen bon. | Jolanda-noodrem als Anna irritant wordt mid-expositie. Komma-lijst uit huidige `.env` wordt overgenomen |
+| `WAKE_ACK`, `SLEEP_ACK` korte bevestigingen | Blijven, uit `inhoud.json.situaties` (nieuw: `wake_ack`, `sleep_ack`) | Hoorbare bevestiging dat Anna het commando hoorde |
 | `install.sh` (systemd-unit template, model-downloads, dependencies) | Aangepaste `install.sh` — 1 service `anna-nova.service`, geen galerij-services | systemd-skelet bruikbaar, alleen inhoud wisselt |
 | `config.sample.env` | Nieuwe, veel kortere `.env.sample` (zie bron 2). Behouden: `MISTRAL_API_KEY`, `MISTRAL_MODEL`, `PIPER_VOICE`, `AUDIO_INPUT_DEVICE`, `AUDIO_OUTPUT_DEVICE`, `SPEAK_ANGLE_CENTER`/`MARGIN`, `ASR_ENGINE`, `VOXTRAL_MODEL` | Hardware-config is hergebruikbaar |
 | Hailo face-detection (`vision.py` SCRFD) | `anna/see.py` — alleen "hoeveel mensen op plek" nodig, geen mood/attr | Face-count is de nieuwe rol; mood kan eruit |
@@ -40,24 +49,58 @@ Deze stukken zijn werkend fundament uit de afgelopen week. Niet weggooien — ma
 
 ## Wat uit het oude plan WEG GAAT (verwijderen in branch)
 
-Bron 2 is duidelijk: geen galerij, geen foto's, geen SSD, bezoekers niet onthouden. Daarmee verdwijnt:
+Bron 2: geen galerij draaiend, geen SSD, bezoekers niet onthouden. Daarmee verdwijnt:
 
-- **Hele foto-pijplijn**: `anna-sync.py`, `web/gallery.html`, `PHOTO_UPLOAD_*` env-vars, rate-limit, SFTP-config, SSH-key voor GitHub Pages, foto-filters (blur/pixelate/edge-sketch/combi)
 - **Voice-recognition**: `anna-enroll.py`, resemblyzer, voiceprint-threshold, "Jolanda-herkenning" in persona
 - **Nachtslaap / persona-arc**: `nachtslaap.py`, `persona_history` SQLite-tabel, dag-arc reflectie. Anna heeft geen dag-geheugen meer — elke bon is het enige exemplaar.
-- **Wake-phrase als trigger**: `WAKE_PHRASE=hoi anna nova`, `WAKE_ACK`, `AWAKE_TIMEOUT`. Trigger is nu spreekplek, niet woord. Slaap-commando's van Jolanda (`SLEEP_PHRASES`) vervallen ook.
-- **Ambient-mompelen in sluimer** (`AMBIENT_LINES`): vervangen door `lokzinnen` uit `inhoud.json` (anders woord, andere plek, maar vergelijkbaar effect)
+- **Ambient-mompelen in sluimer** (`AMBIENT_LINES`): vervangen door `lokzinnen` uit `inhoud.json` (vergelijkbaar effect, nieuwe content-plek)
 - **Grace-farewell** (`GRACE_FAREWELL_*`): vervangen door `slotzinnen` en `na_nee` uit `inhoud.json`
 - **Uitgebreide persona.md-secties 3-11** (reden van bestaan, backstory, meningen, wat Anna leuk vindt, grenzen): komt uit als "lore"-document; brain.py gebruikt alleen een korte system-prompt. De uitgebreide tekst blijft in de repo als `docs/persona-archief.md` — Jolanda kan er stukken uit halen voor interviews/perstekst.
 - **SD-backup fase 13**: geen uitgebreid backup-ritueel. Wel: één `.img` dump aan het eind van de bouwdag, maar geen SSD.
-- **Externe galerij HTTP-server op poort 8765**: wordt alleen nog gebruikt voor `face/index.html` via websocket (of file:// als dat kan). Geen `/gallery`-route meer.
+- **Externe galerij HTTP-server-route `/gallery`**: wordt niet meer gestart (zie "Slapend laten" hieronder).
 - **De 7 beslismomenten uit het oude plan**: vervangen door nieuwe beslismomenten (zie onder).
+
+## Slapend laten bestaan (niet slopen, niet gebruiken)
+
+Jolanda wil deze code behouden voor een mogelijke latere revival; we doen er nu niks mee, maar we gooien het ook niet weg.
+
+| Bestand / stuk code | Status vandaag | Reden behouden |
+|---|---|---|
+| `vision.py` → `_photo_pipeline()`, `_apply_filter()`, foto-opslag | **Niet aangeroepen**. Code blijft staan, service-loop start geen foto-thread. | Mogelijk later terugkomen op foto-concept |
+| `anna-sync.py` | **Niet gestart**. Blijft in repo. | Werkende SFTP/GitHub-Pages sync-code |
+| `web/gallery.html` + CSS | **Niet geserveerd**. Blijft in repo. | Ontwerp bruikbaar voor ander kunstwerk |
+| `PHOTO_*` env-vars in `config.sample.env` | **Verplaatst naar `config.sample.env` sectie "# SLAPEND — foto-pijplijn (niet actief)"** met expliciete markering | Duidelijk wat uit staat |
+| Hailo face-attr (mood-detection) | **Niet aangeroepen**. HEF kan op Pi blijven. | Mogelijk later |
+
+**Belangrijk**: in `anna/main.py` géén imports naar foto-code. De bestanden bestaan maar worden niet geladen, zodat `systemctl status anna-nova` geen foto-gerelateerde errors geeft.
 
 ---
 
+## Volgorde vandaag — printer en dongel komen 's middags
+
+Bron 2 nummert bouwstappen 1–10. Omdat de printer en USB wifi-dongel pas na de lunch binnen zijn, draaien we de volgorde om:
+
+**Ochtend (zonder printer, zonder dongel)** — offline + Pi met huidige wifi:
+- Bouwstap 2 (inhoud.json + bon.py + test_bon.py) — laptop
+- Bouwstap 4 (flow.py droogloop) — laptop, inclusief wake-phrase + sleep-phrases
+- Bouwstap 5 (brain.py + 10 testvoorbeelden) — laptop + Mistral
+- Bouwstap 7 (hear + see + wake-detect + sleep-detect op Pi) — Pi, camera is net aangesloten
+- Bouwstap 8-voorbereiding (face.html aanpassen voor 7 nieuwe states) — laptop
+- Bouwstap 6a (render_audio draaien — kan lang duren, parallel) — laptop
+
+**Middag (printer binnen + eventueel wifi-dongel)**:
+- Bouwstap 1 (printer pairen) — Pi + printer
+- Bouwstap 3 (printer.py integratie + echte bon) — Pi + printer
+- Bouwstap 6b (speak.py op Pi testen) — Pi
+- Bouwstap 8 (face.py + scherm) — Pi, Jolanda bekijkt
+- Bouwstap 9 (groepstest met 5 vrienden) — atelier
+- Bouwstap 10 (expositie-klaar) — Pi
+
+Als de dongel niet komt: ochtend Voxtral/Mistral werkt mogelijk trager → fallback voor render_audio is Piper offline-render (consistent, iets minder natuurlijk). Flow.py kan volledig zonder dongel.
+
 ## De 10 bouwstappen van bron 2 — vertaald naar vandaag
 
-Bron 2 geeft 10 bouwstappen, elk eindigend in een test. Hieronder per stap: wie doet wat, waar (Pi / lokaal), hoeveel tijd, wat Jolanda beslist.
+Bron 2 geeft 10 bouwstappen, elk eindigend in een test. Hieronder per stap: wie doet wat, waar (Pi / lokaal), hoeveel tijd, wat Jolanda beslist. Volgorde van bron 2 behouden voor referentie; het dagritme (verderop) herverdeelt ze.
 
 ### Bouwstap 1 — Printertje aan de praat
 **Wie**: Jolanda fysiek (printer uit doos, aanzetten, Bluetooth pairen met Pi) + ik in SSH. **Waar**: Pi. **Tijd**: 30–60 min (zoals bron 2 zegt: max 1u proberen).
@@ -89,7 +132,25 @@ Bellt in op bouwstap 1's print-CLI. Fallback-cascade: (1) mini via Bluetooth, (2
 ### Bouwstap 4 — `anna/flow.py` droogloop (de machine zelf)
 **Wie**: ik autonoom lokaal. **Waar**: laptop. **Tijd**: 2–3u (grootste werk).
 
-Volledige state-machine volgens tabel in bron 2: RUST → OPENING → VRAAG → LUISTEREN → REAGEREN → … → BON → LOSLATEN. 11 toestanden. Tellers: 2 zijwegen → AFSLUITING, 5 min totaal → AFSLUITING, 6s leeg plek → LOSLATEN. Vraag-trekkings-regel (1 bekeken+licht, 1 bewaard, 1 wrijving, 1 vrij).
+Volledige state-machine volgens tabel in bron 2 — **aangepast** voor wake-phrase en sleep-phrases:
+
+| Toestand | Trigger naar deze toestand | Wat Anna doet | Naar |
+|---|---|---|---|
+| RUST | start, LOSLATEN, SLEEP_PHRASE | Slaapt, roept lokzin als mensen in ruimte maar niet op plek | **wake-phrase detected** → WAKE_ACK → OPENING |
+| OPENING | wake-phrase gehoord | Korte "Hm."/WAKE_ACK + speelt willekeurige opening | VRAAG |
+| VRAAG | OPENING, REAGEREN | Stelt volgende vraag uit getrokken reeks | LUISTEREN |
+| LUISTEREN | VRAAG | Wacht spraak van plek | REAGEREN, STIL na 8s, RUIS, of **sleep-phrase → LOSLATEN** |
+| REAGEREN | LUISTEREN met spraak | Mistral-call, speelt reactie/brugzin | VRAAG, AFSLUITING of ZACHT |
+| STIL, RUIS, DRUK, ZACHT | (zoals bron 2) | (zoals bron 2) | (zoals bron 2); sleep-phrase werkt ook hier |
+| AFSLUITING | 4 vragen klaar / 5 min / 2 zijwegen / ZACHT | "Wil je de rekening?" | BON bij ja, LOSLATEN bij nee |
+| BON | AFSLUITING met ja | Bouwt en print bon, speelt slotzin | LOSLATEN |
+| LOSLATEN | BON / nee / 6s plek leeg / SLEEP_PHRASE | Wist gesprek | RUST |
+
+**Nieuwe elementen t.o.v. bron 2**:
+- Wake-phrase is primaire RUST→OPENING trigger. "Iemand op plek" alleen is niet genoeg.
+- Sleep-phrase werkt in élke actieve toestand (vangt Anna in één keer stil).
+- WAKE_ACK uit `inhoud.json.situaties.wake_ack` (bijv. "Hm.", "Hé.", "Ja?")
+- SLEEP_ACK uit `inhoud.json.situaties.sleep_ack` (bijv. "Mmh. Welterusten.")
 
 Droogloop-modus (`DROOGLOOP=1` in `.env`):
 - hear.py → `input()` ipv mic
@@ -97,15 +158,16 @@ Droogloop-modus (`DROOGLOOP=1` in `.env`):
 - printer.py → PNG opslaan ipv printen
 - see.py → `[1 persoon op plek]` indicator in console; typ `#weg` om te simuleren weg
 
-Debug-toetsen tijdens droogloop: Enter = stilte, `#ruis` = ruis-detectie, `#druk` = meerdere mensen, `#weg` = plek leeg.
+Debug-toetsen tijdens droogloop: Enter = stilte, `#ruis` = ruis-detectie, `#druk` = meerdere mensen, `#weg` = plek leeg. Normale tekst = gesproken zin. Begint met "hoi anna nova" (of variant) → wake-trigger. Bevat sleep-phrase (bijv. "slaap lekker") → direct LOSLATEN.
 
 🔔 **Beslismoment 3**: Jolanda speelt 5 droogloop-gesprekken na — doet ze het nog een keer als het haar irriteert?
 - Voelen brugzinnen natuurlijk?
 - Zijn de 4 vragen de juiste?
 - Mist er een zacht-situatie?
 - Werkt de 2-zijwegen-regel?
+- Wake-ack kort genoeg (niet irritant bij veel bezoekers)?
 
-**Test**: 5 droogloop-gesprekken (zie `TESTPLAN_V2.md`).
+**Test**: 5 droogloop-gesprekken (zie `TESTPLAN_V2.md`), start steeds met wake-phrase, 1x met sleep-phrase midden in.
 
 ### Bouwstap 5 — `anna/brain.py` (Mistral JSON-call)
 **Wie**: ik autonoom lokaal. **Waar**: laptop + Mistral-API. **Tijd**: 45 min.
@@ -127,14 +189,24 @@ System-prompt in Nederlands. Verwachte output: `{"soort":"antwoord|pas|zijweg|pr
 
 **Test**: `OPENING` triggeren in droogloop → audio uit laptopspeaker.
 
-### Bouwstap 7 — `anna/hear.py` + `anna/see.py` aan flow koppelen
-**Wie**: ik + Jolanda. **Waar**: Pi. **Tijd**: 60 min.
+### Bouwstap 7 — `anna/hear.py` + `anna/see.py` + wake/sleep aan flow koppelen
+**Wie**: ik + Jolanda. **Waar**: Pi. **Tijd**: 75 min.
 
-Spreekplek-logica: ReSpeaker DoA ±30° EN `see.py` zegt 1 persoon op plek → "spreker is OK". Meer dan 1 persoon of overlappende stemmen (2 DoA-pieken) → DRUK. Knopmodus: USB-knop (GPIO of HID) → luistert alleen tijdens druk. 30s rust zonder knop → terug naar normaal.
+Drie subsystemen:
 
-**Test**: stem recht voor Anna telt; stem schuin achter telt niet. Jolanda doet beide.
+1. **Wake-phrase detectie in RUST**: hear.py luistert continu met VAD (lage drempel voor CPU). Elke spraak-blob gaat door Voxtral (mini-latest) → tekst matcht fuzzy tegen `WAKE_PHRASE_PATTERNS` (uit `.env`, komma-lijst, substring+edit-distance zoals huidige code). Match → `hear.wake_detected()` event naar flow. De spreker-richting hoeft niet op plek te zijn (iemand staat voor Anna, spreekt haar aan — dan loopt die de laatste meter).
 
-🔔 **Beslismoment 6**: hoek-marge goed op 30°? Hoor-radius goed? Camera-check nodig of DoA alleen voldoende?
+2. **Sleep-phrase detectie in alle actieve toestanden**: zelfde VAD-pipeline, elke transcriptie ook getest tegen `SLEEP_PHRASES` (komma-lijst). Match → `hear.sleep_detected()` event → flow springt direct naar LOSLATEN. Werkt ongeacht wie het zegt (bezoeker zegt per ongeluk "ga slapen" = Anna slaapt, Jolanda haalt haar weer wakker met wake-phrase).
+
+3. **Spreekplek-filter in LUISTEREN**: ReSpeaker DoA ±30° (hoek) EN `see.py` zegt 1 persoon op plek → "spreker telt mee voor Mistral". Meer dan 1 persoon of overlappende stemmen (2 DoA-pieken) → DRUK. Knopmodus: USB-knop (GPIO of HID) → luistert alleen tijdens druk. 30s rust zonder knop → terug naar normaal.
+
+**Test**:
+- Wake-phrase test: 10 varianten (zie TESTPLAN_V2). ≥8 moet wakker maken, nul "een van 5 vrienden die het toevallig zegt in achtergrond" (want niemand op plek).
+  - Nuance: wake-phrase mag vanaf elke richting komen (iemand loopt op Anna af), maar als wake triggert terwijl geen enkele face in frame → Anna zegt alleen WAKE_ACK, blijft in half-wakker. Pas als persoon op plek staat binnen 5s: OPENING. Anders terug RUST. **Dit voorkomt achtergrond-false-wakes zonder iemand voor haar.**
+- Sleep-phrase test: Jolanda zegt mid-gesprek "slaap lekker" → binnen 2s SLEEP_ACK en terug naar RUST.
+- Spreekplek-filter test: stem recht voor Anna telt; stem schuin achter telt niet.
+
+🔔 **Beslismoment 6**: hoek-marge goed op 30°? Hoor-radius goed? Wake-ack kort of weg? Sleep-ack blijft?
 
 ### Bouwstap 8 — `anna/face.py` + scherm
 **Wie**: ik + Jolanda. **Waar**: Pi + Chromium. **Tijd**: 45 min.
@@ -209,20 +281,30 @@ Jolanda heeft 1 dag. Serieel zou dit ~10u zijn. Parallel kan het in ~6u — als 
 
 **Mergepunt**: wanneer flow.py droogloop werkt op laptop → Jolanda speelt 5 gesprekken (beslismoment 3), dan pullen we naar Pi en koppelen hear/see (bouwstap 7).
 
-### Dagritme (ruw, laten bijstellen)
+### Dagritme (ruw, laten bijstellen) — printer en dongel pas vanmiddag
 
 | Tijd | 🅰️ Pi-track (Jolanda + ik) | 🅱️ Inhoud-track (ik solo) | 🅲️ Flow-track (ik solo) |
 |---|---|---|---|
-| 09:00 | repo-keuze maken (0a/0b), sanity-check | start `inhoud.json` + bon.py | start `flow.py` state-machine |
-| 10:00 | bouwstap 1 printer pairen | test_bon.py → **beslismoment 2** | flow.py tellers + vraagtrek |
-| 11:00 | bouwstap 3 printer.py op Pi | brain.py + 10 tests → **beslismoment 4** | flow.py droogloop af |
-| 12:00 | LUNCH | — | — |
-| 13:00 | bouwstap 7 hear/see op Pi | render_audio.py start (lang) | **beslismoment 3** droogloop-gesprekken met Jolanda |
-| 14:00 | bouwstap 8 scherm → **beslismoment 7** | audio-render af → speak.py integratie | bouwstap 7 code |
-| 15:00 | bouwstap 9 groepstest → **beslismoment 8** | — | — |
-| 16:00 | bouwstap 10 expositie-klaar → **beslismoment 9** | — | — |
+| 09:00 | Pi sanity + camera verifiëren (`rpicam-hello`) | start `content/inhoud.json` + `bon.py` | start `flow.py` skelet (incl. wake/sleep-states) |
+| 10:00 | hear.py uitbouwen: wake-detect + sleep-detect op Pi | `test_bon.py` → **🔔 beslismoment 2** (5 PNG's) | flow.py tellers + vraagtrek-logica |
+| 11:00 | hear.py test wake-woorden (10 varianten) → **🔔 beslismoment 4** (brain.py 10 voorbeelden na) | `brain.py` + 10 voorbeelden | flow.py droogloop compleet |
+| 12:00 | LUNCH | LUNCH | **🔔 beslismoment 3** (5 droogloop-gesprekken met Jolanda) |
+| 12:45 | **🅰️ hardware komt binnen**: printer + evt dongel uitpakken | `render_audio.py` draaien (15-30 min) | face.html aanpassen (7 states) |
+| 13:15 | bouwstap 1 printer pairen → **🔔 beslismoment 1** | audio render af; `speak.py` cascade op Pi | — |
+| 14:00 | bouwstap 3 printer.py integratie | — → **🔔 beslismoment 5** (stem-vergelijking) | — |
+| 14:45 | bouwstap 7 complete: see.py camera + spreekplek-filter → **🔔 beslismoment 6** | — | — |
+| 15:30 | bouwstap 8 scherm live → **🔔 beslismoment 7** (7 states) | — | — |
+| 16:15 | bouwstap 9 groepstest met vrienden → **🔔 beslismoment 8** | — | — |
+| 17:00 | bouwstap 10 expositie-klaar + eindsimulatie → **🔔 beslismoment 9** | — | — |
 
-Totaal: ~7u met 1u lunch = klaar rond 16:00. Buffer tot 18:00 voor fixes.
+Totaal: ~8u. Buffer 17:30–18:30 voor fixes / tweede ronde drempels / SD-image.
+
+**Belangrijke parallelliteit vóór hardware-aankomst**:
+- Terwijl 🅱️ aan inhoud werkt en 🅲️ aan flow, kan 🅰️ al hear.py bouwen op Pi want **camera is al aangesloten** en wifi werkt al (tragelijk, maar werkt).
+- Wake/sleep-detect kan volledig op Pi getest voor printer binnen is — gewoon via mic. Jolanda doet dat tussen beslismoment 2 en 3.
+- Render_audio draait "in de lunch-window" — niets anders op laptop nodig.
+
+**Als dongel niet komt**: render_audio-fallback is Piper offline (consistent, iets minder natuurlijk). Flow + brain + wake blijven werken op huidige wifi.
 
 ---
 
@@ -237,15 +319,15 @@ Nieuwe lijst, vervangt de 7 uit `MORGEN_AANPAK.md`. Totaal 9 + 2 voorab = 11, ma
 
 ### Tijdens de bouwdag
 
-🔔 **Beslismoment 1** (bouwstap 1, 10:00): printer-plan B als Bluetooth faalt?
-🔔 **Beslismoment 2** (bouwstap 2, 10:30): 5 PNG-bonnen OK (percentage-notatie, quote-selectie, prijs-plakking)?
-🔔 **Beslismoment 3** (bouwstap 4, 13:00): droogloop-gesprekken — voelen de zinnen als Anna?
-🔔 **Beslismoment 4** (bouwstap 5, 11:30): brain.py 10 testvoorbeelden — JSON-output natuurlijk?
-🔔 **Beslismoment 5** (bouwstap 6, 14:00): rendered audio vs live TTS — één stem of twee?
-🔔 **Beslismoment 6** (bouwstap 7, 13:30): spreekplek-marge 30° goed?
-🔔 **Beslismoment 7** (bouwstap 8, 14:30): 7 state-screens — welke onduidelijk?
-🔔 **Beslismoment 8** (bouwstap 9, 15:30): groepstest-drempels OK?
-🔔 **Beslismoment 9** (bouwstap 10, 16:30): expositie-go?
+🔔 **Beslismoment 2** (bouwstap 2, ±10:30): 5 PNG-bonnen OK (percentage-notatie, quote-selectie, prijs-plakking)?
+🔔 **Beslismoment 4** (bouwstap 5, ±11:30): brain.py 10 testvoorbeelden — JSON-output natuurlijk?
+🔔 **Beslismoment 3** (bouwstap 4, ±12:00): droogloop-gesprekken — voelen de zinnen als Anna? Wake-ack kort?
+🔔 **Beslismoment 1** (bouwstap 1, ±13:15): printer-plan B als Bluetooth faalt?
+🔔 **Beslismoment 5** (bouwstap 6, ±14:00): rendered audio vs live TTS — één stem of twee?
+🔔 **Beslismoment 6** (bouwstap 7, ±14:45): spreekplek-marge 30°, wake-fuzzy ruim of strak?
+🔔 **Beslismoment 7** (bouwstap 8, ±15:30): 7 state-screens — welke onduidelijk?
+🔔 **Beslismoment 8** (bouwstap 9, ±16:15): groepstest-drempels OK?
+🔔 **Beslismoment 9** (bouwstap 10, ±17:00): expositie-go?
 
 **Totaal Jolanda-tijd aan beslissingen**: ~70 min over de hele dag.
 
