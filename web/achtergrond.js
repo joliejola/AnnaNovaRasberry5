@@ -28,6 +28,28 @@
   let canvas, ctx, cellW, cellH;
   let latestStippen = null, latestPose = null;
 
+  // State-palette: elke toestand krijgt eigen kleur + animatie-stijl.
+  // Komt uit document.body.className (face.html zet 'state-xxx').
+  const THEMES = {
+    sluimert:  { stip: "180, 60, 80",    key: "220, 90, 100",  puls: 0.08, draai: 0 },
+    luistert:  { stip: "180, 220, 190",  key: "200, 230, 200", puls: 0.02, draai: 0 },
+    denkt:     { stip: "200, 180, 140",  key: "244, 184, 96",  puls: 0.04, draai: 0.9 },
+    spreekt:   { stip: "244, 160, 96",   key: "250, 190, 120", puls: 0.18, draai: 0 },
+    afrekenen: { stip: "240, 230, 200",  key: "250, 240, 210", puls: 0.05, draai: 0 },
+    print:     { stip: "240, 230, 200",  key: "250, 240, 210", puls: 0.10, draai: 0 },
+    knopmodus: { stip: "180, 180, 190",  key: "220, 220, 230", puls: 0.03, draai: 0 },
+    offline:   { stip: "120, 50, 50",    key: "160, 70, 70",   puls: 0.0,  draai: 0 },
+  };
+  const DEFAULT_THEME = THEMES.sluimert;
+
+  function currentTheme() {
+    const cls = (document.body && document.body.className) || "";
+    for (const key in THEMES) {
+      if (cls.indexOf("state-" + key) !== -1) return THEMES[key];
+    }
+    return DEFAULT_THEME;
+  }
+
   function init() {
     canvas = document.getElementById("achtergrond");
     if (!canvas) {
@@ -117,21 +139,25 @@
     }, 100);  // 10 fps mock
   }
 
-  // --- render loop (requestAnimationFrame, ~60 fps draw, data update eigen tempo)
-  function tekenLus() {
+  // --- render loop ---------------------------------------------------------
+  function tekenLus(ts) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (latestStippen) tekenStippen(latestStippen);
-    if (latestPose)    tekenPose(latestPose);
+    const theme = currentTheme();
+    // Puls: zacht sinusoidaal rond 1.0, amplitude uit theme
+    const t = (ts || 0) / 1000;
+    const pulse = 1 + Math.sin(t * 2.4) * theme.puls;
+    if (latestStippen) tekenStippen(latestStippen, theme, pulse);
+    if (latestPose)    tekenPose(latestPose, theme, t);
     requestAnimationFrame(tekenLus);
   }
 
-  function tekenStippen(grid) {
+  function tekenStippen(grid, theme, pulse) {
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const v = grid[y * COLS + x] || 0;
         if (v < 0.02) continue;
-        const r = 1 + v * 4;
-        ctx.fillStyle = `rgba(200, 200, 200, ${0.2 + v * 0.55})`;
+        const r = (1 + v * 4) * pulse;
+        ctx.fillStyle = `rgba(${theme.stip}, ${(0.2 + v * 0.55) * pulse})`;
         ctx.beginPath();
         ctx.arc(x * cellW + cellW / 2, y * cellH + cellH / 2, r, 0, Math.PI * 2);
         ctx.fill();
@@ -139,14 +165,34 @@
     }
   }
 
-  function tekenPose(pts) {
-    // Geen lijnen tussen keypoints — alleen de gouden stippen zelf.
-    // (Skelet-visualisatie oogde als een "poppetje" wat te letterlijk was.)
-    ctx.fillStyle = "rgba(244, 184, 96, 0.85)";  // goud-accent
+  function tekenPose(pts, theme, t) {
+    // Keypoint-stippen in theme-kleur. Bij 'denkt' draaien ze in cirkel om
+    // het zwaartepunt van de persoon (= het "nadenken" animeert).
+    const draai = theme.draai;
+    let cx = 0, cy = 0, n = 0;
+    if (draai) {
+      for (const p of pts) {
+        if (!p || (p[2] || 0) < 0.3) continue;
+        cx += p[0]; cy += p[1]; n++;
+      }
+      if (n) { cx /= n; cy /= n; }
+    }
+    const spin = draai ? t * draai : 0;
+    const pulseAlpha = 0.85 + Math.sin(t * 3) * theme.puls * 2;
+    ctx.fillStyle = `rgba(${theme.key}, ${Math.min(1, pulseAlpha)})`;
     for (const p of pts) {
       if (!p || (p[2] || 0) < 0.3) continue;
+      let px = p[0], py = p[1];
+      if (draai && n) {
+        // Roteer elk keypoint om zwaartepunt (zachte orbit)
+        const dx = px - cx, dy = py - cy;
+        const cs = Math.cos(spin), sn = Math.sin(spin);
+        px = cx + dx * cs - dy * sn;
+        py = cy + dx * sn + dy * cs;
+      }
+      const r = 4 * (1 + theme.puls * 0.5);
       ctx.beginPath();
-      ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 4, 0, Math.PI * 2);
+      ctx.arc(px * canvas.width, py * canvas.height, r, 0, Math.PI * 2);
       ctx.fill();
     }
   }

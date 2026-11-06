@@ -26,21 +26,47 @@
       color: rgba(255,255,255,0.45); background: rgba(0,0,0,0.6);
       padding: 0.6vmin 1vmin; border-radius: 4px;
     }
+    .state-picker {
+      position: fixed; bottom: 2vmin; left: 50%; transform: translateX(-50%);
+      z-index: 4; display: flex; gap: 1vmin; font-family: ui-monospace, monospace;
+    }
+    .state-picker button {
+      background: rgba(0,0,0,0.6); color: #fff5ea;
+      border: 1px solid rgba(255,245,234,0.3); padding: 1vmin 1.5vmin;
+      font-family: inherit; font-size: 1.6vmin; cursor: pointer; border-radius: 4px;
+    }
+    .state-picker button:hover { border-color: rgba(255,245,234,0.8); }
+    .state-picker button.actief { background: rgba(244,184,96,0.3); border-color: #f4b860; }
   </style>
 </head>
-<body>
+<body class="state-sluimert">
   <canvas id="achtergrond"></canvas>
   <div class="cel-mock">
-    <div class="hint">zeg "hoi anna nova"</div>
+    <div class="hint" id="hint">zeg "hoi anna nova"</div>
   </div>
-  <div class="label-corner">DEMO · achtergrond.js stippen 64×48 + pose mock</div>
+  <div class="label-corner">DEMO · stippen + stippen-keypoints · klik een state ↓</div>
+  <div class="state-picker">
+    <button data-state="sluimert" data-hint='zeg "hoi anna nova"'>sluimert</button>
+    <button data-state="luistert" data-hint='ik luister…'>luistert</button>
+    <button data-state="denkt"    data-hint='ik denk…'>denkt</button>
+    <button data-state="spreekt"  data-hint='ik vertel…'>spreekt</button>
+  </div>
   <script src="achtergrond.js?demo=1"></script>
   <script>
-    // Force demo-modus zelfs zonder ?demo=1 in URL
+    // Force demo-modus
     if (!location.search.includes("demo")) {
       history.replaceState(null, "", location.pathname + "?demo=1");
       location.reload();
     }
+    // State-picker: wissel body.className zodat achtergrond.js kleur/puls wisselt
+    const knoppen = document.querySelectorAll(".state-picker button");
+    function setActive(btn) {
+      knoppen.forEach(b => b.classList.toggle("actief", b === btn));
+      document.body.className = "state-" + btn.dataset.state;
+      document.getElementById("hint").textContent = btn.dataset.hint;
+    }
+    knoppen.forEach(b => b.addEventListener("click", () => setActive(b)));
+    setActive(document.querySelector('[data-state="sluimert"]'));
   </script>
 </body>
 </html>
