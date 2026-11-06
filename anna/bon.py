@@ -243,10 +243,7 @@ def render_bon(
     hoogte += LINE  # (leeg)
     hoogte += LINE  # Wereldwijd in AI
     hoogte += LINE  # gestoken in 2026:
-    hoogte += LINE + 4  # $ 2.670...
-    hoogte += LINE  # (leeg)
-    hoogte += LINE  # Jouw aandeel:
-    hoogte += LINE + 6  # {pct} %
+    hoogte += LINE + 6  # $ 2.670...
     hoogte += SEP_HEIGHT  # ----
     hoogte += SMLINE  # datum
     hoogte += SMLINE  # url
@@ -302,13 +299,6 @@ def render_bon(
     dr.text((margin, y), "gestoken in 2026:", font=font_body, fill=0)
     y += LINE
     dr.text((margin, y), ai_bedrag, font=font_body_b, fill=0)
-    y += LINE + 4
-
-    y += LINE  # lege regel
-
-    dr.text((margin, y), "Jouw aandeel:", font=font_body, fill=0)
-    y += LINE
-    dr.text((margin, y), f"{pct_str} %", font=font_body_b, fill=0)
     y += LINE + 6
 
     _horizontale_lijn(dr, y, breedte_px, margin)
