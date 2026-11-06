@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!-- Demo-pagina voor achtergrond.js — toont stippenraster + mock pose zonder
+     dat Hailo op de Pi hoeft te draaien. Open in browser met ?demo=1.
+     Voor écht live beeld van de camera: open face/index.html die achtergrond.js
+     via websocket laadt. -->
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>Anna — achtergrond demo</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #140306; color: #fff5ea; font-family: sans-serif; overflow: hidden; }
+    #achtergrond { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; }
+    .cel-mock {
+      position: fixed; inset: 0; z-index: 2;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      pointer-events: none;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.95), 0 0 32px rgba(0,0,0,0.85);
+    }
+    .cel-mock .hint {
+      font-family: Georgia, serif; font-style: italic;
+      font-size: 6vmin; opacity: 0.8;
+    }
+    .label-corner {
+      position: fixed; top: 1.2vmin; left: 1.2vmin; z-index: 3;
+      font-family: ui-monospace, Menlo, monospace; font-size: 2vmin;
+      color: rgba(255,255,255,0.45); background: rgba(0,0,0,0.6);
+      padding: 0.6vmin 1vmin; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="achtergrond"></canvas>
+  <div class="cel-mock">
+    <div class="hint">zeg "hoi anna nova"</div>
+  </div>
+  <div class="label-corner">DEMO · achtergrond.js stippen 64×48 + pose mock</div>
+  <script src="achtergrond.js?demo=1"></script>
+  <script>
+    // Force demo-modus zelfs zonder ?demo=1 in URL
+    if (!location.search.includes("demo")) {
+      history.replaceState(null, "", location.pathname + "?demo=1");
+      location.reload();
+    }
+  </script>
+</body>
+</html>
