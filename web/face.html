@@ -26,13 +26,15 @@
       background: #000;
     }
 
-    /* Achtergrond-canvas: stippen 64x48 + pose-keypoints uit see.py.
-       Werkt met achtergrond.js op /achtergrond.js, data via ws :8766. */
+    /* Achtergrond-canvas: statische backdrop + optioneel stippen uit see.py.
+       Tot camera werkt: backdrop.webp als sfeer-beeld. */
     #achtergrond {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
       z-index: 0;
-      background: #0a0205;
+      background: #0a0205 url('/backdrop.webp') center/cover no-repeat;
+      filter: blur(2px) brightness(0.75) saturate(1.05);
+      transform: scale(1.04);
     }
 
     /* --- Vignette: kleur per state. Center openen in actieve toestanden. --- */
