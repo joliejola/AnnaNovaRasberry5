@@ -68,13 +68,16 @@ def _run() -> None:
 
     try:
         cam = Picamera2()
-        # Lo-res config voor snelheid; 160x120 is overgeschat voor 64x48 raster
+        # 640x480 is de laagste native OV5647-mode — betrouwbaarder dan 160x120
         cfg = cam.create_preview_configuration(
-            main={"size": (160, 120), "format": "YUV420"},
+            main={"size": (640, 480), "format": "YUV420"},
+            buffer_count=4,
         )
         cam.configure(cfg)
         cam.start()
-        log.info("see_live: picamera2 open (160x120 YUV)")
+        log.info("see_live: picamera2 open (640x480 YUV)")
+        # Eerste frame kan traag zijn — warm-up
+        time.sleep(1.5)
     except Exception as e:
         log.error("see_live: picamera2 start faalt: %s", e)
         return
@@ -85,8 +88,8 @@ def _run() -> None:
             t0 = time.monotonic()
             try:
                 frame = cam.capture_array("main")
-                # YUV420: Y-plane is de eerste 120 rijen
-                y = frame[:120, :160]  # grijs
+                # YUV420: Y-plane = eerste H rijen. 640x480 → 480 rijen Y.
+                y = frame[:480, :640]
                 raster = _downsample_to_64x48(y)
                 _set_raster(raster)
             except Exception as e:
