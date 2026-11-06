@@ -14,9 +14,14 @@ models/*.hef
 
 # venv
 venv/
+.venv/
 __pycache__/
 *.pyc
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Bouwplan v2
+out/
+audio/*.wav
