@@ -114,17 +114,33 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/tick"):
             body = json.dumps(_STATE.snapshot()).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._json(body)
+            return
+        if self.path.startswith("/raster"):
+            # Camera-raster + pose voor achtergrond.js (HTTP-polling)
+            try:
+                from anna import see_live
+                payload = {
+                    "grid": see_live.get_raster(),
+                    "pts": see_live.get_pose(),
+                }
+            except Exception:
+                payload = {"grid": None, "pts": None}
+            body = json.dumps(payload).encode()
+            self._json(body)
             return
         if self.path in ("/", "/index.html"):
             self.path = "/face.html"
         return super().do_GET()
+
+    def _json(self, body: bytes) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, fmt, *args):
         # Quiet HTTP log — logger pakt errors op elders

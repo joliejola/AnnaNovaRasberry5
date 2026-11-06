@@ -78,20 +78,20 @@
   }
 
   function connectWs() {
-    const url = (location.protocol === "https:" ? "wss" : "ws") +
-                "://" + location.hostname + ":8766";
-    const ws = new WebSocket(url);
-    ws.onmessage = (e) => {
+    // HTTP-polling fallback: haalt /raster elke 100ms op (10 fps).
+    // Simpeler dan websocket, werkt met face.py HTTP-server.
+    async function poll() {
       try {
-        const m = JSON.parse(e.data);
-        if (m.type === "stippen" && Array.isArray(m.grid)) latestStippen = m.grid;
-        if (m.type === "pose" && Array.isArray(m.pts))    latestPose    = m.pts;
-      } catch (err) {
-        console.error("[achtergrond] bad msg", err);
+        const r = await fetch("/raster", { cache: "no-store" });
+        const j = await r.json();
+        if (Array.isArray(j.grid)) latestStippen = j.grid;
+        if (Array.isArray(j.pts))  latestPose    = j.pts;
+      } catch (e) {
+        // netwerk weg of face.py niet aan — stil
       }
-    };
-    ws.onclose = () => setTimeout(connectWs, 2000);
-    ws.onerror = () => ws.close();
+    }
+    poll();
+    setInterval(poll, 100);
   }
 
   // --- demo: random stippen-noise + "ademende" pose in het midden ----------
@@ -152,12 +152,15 @@
   }
 
   function tekenStippen(grid, theme, pulse) {
+    // Stip-radius schaalt met cel-grootte: op scherm is dat merkbaar, op
+    // kleine preview blijven ze zichtbaar. Max = halve cel (vloeiende halftone).
+    const baseR = Math.min(cellW, cellH) * 0.5;
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const v = grid[y * COLS + x] || 0;
         if (v < 0.02) continue;
-        const r = (1 + v * 4) * pulse;
-        ctx.fillStyle = `rgba(${theme.stip}, ${(0.2 + v * 0.55) * pulse})`;
+        const r = baseR * (0.3 + v * 1.2) * pulse;
+        ctx.fillStyle = `rgba(${theme.stip}, ${Math.min(1, (0.35 + v * 0.65) * pulse)})`;
         ctx.beginPath();
         ctx.arc(x * cellW + cellW / 2, y * cellH + cellH / 2, r, 0, Math.PI * 2);
         ctx.fill();
