@@ -1,9 +1,14 @@
 # Testplan v2 — Anna Nova (bouwplan v2)
 
-*6 november 2026 · vervangt `TESTPLAN_MORGEN.md` en `CONVERSATIE_TESTPLAN.md`*
-*Revisie na Jolanda's feedback 6 nov ochtend: wake is woord (niet plek), sleep-phrases blijven; printer-tests pas vanmiddag.*
+*6 november 2026 · derde revisie na nieuwste bronplan (sync 14:50)*
 
-**Belangrijk**: Anna reageert NOOIT op mensen die alleen op de spreekplek staan. Wake-phrase (woord) is de enige trigger. Dit is anders dan bron 2 oorspronkelijk stelde — bevestigd door Jolanda 6 nov ochtend. Spreekplek-detectie wordt gebruikt voor DRUK-detectie en LUISTEREN-filter, niet voor wake.
+**Wat vast staat:**
+- Wake is woord (*Hoi Anna Nova*), via **offline Vosk** op Pi. Geen cloud tot wake, geen spreekplek-trigger.
+- Script is **vast**: opening + 5 vragen in `reeks` + afrekening. Geen trekking, geen haltes.
+- Brain geeft **max 15 woorden**, **geen vraagteken aan einde**, stelt zelf nooit vragen.
+- 2× stilte op een vraag → **LOSLATEN zonder bon** (*"Weg is ook een antwoord"*).
+- Scherm heeft **6 states**: rust, luistert, denkt, spreekt, afrekenen, print.
+- Achter de cel: bezoeker vaag als **stippen + pose-lijnen** (bouwstap 9, ambitieus).
 
 Per bouwstap uit `BOUWPLAN_V2_AANPAK.md`: de test die Jolanda zelf uitvoert of meeleest, plus baseline-timings en een end-to-end simulatie. Zie `docs/BOUWPLAN_BRON.md` voor het bronplan.
 
