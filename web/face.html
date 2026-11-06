@@ -26,17 +26,14 @@
       background: #000;
     }
 
-    /* Camerabeeld — scherp genoeg om door te schijnen, iets donkerder.
-       Laadt /frame.jpg als die bestaat (op Pi), anders /backdrop.webp. */
-    #cam {
+    /* Achtergrond-canvas: stippen 64x48 + pose-keypoints uit see.py.
+       Werkt met achtergrond.js op /achtergrond.js, data via ws :8766. */
+    #achtergrond {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
-      object-fit: cover;
-      filter: blur(2px) brightness(0.75) saturate(1.05);
-      transform: scale(1.04);
-      transition: filter 1s ease, opacity 0.6s ease;
+      z-index: 0;
+      background: #0a0205;
     }
-    #cam.absent { opacity: 0.55; filter: blur(14px) brightness(0.55); }
 
     /* --- Vignette: kleur per state. Center openen in actieve toestanden. --- */
     .vignette {
@@ -329,7 +326,7 @@
 <body class="state-rust">
   <div class="stage">
     <div class="square">
-      <img id="cam" src="/backdrop.webp" alt="">
+      <canvas id="achtergrond"></canvas>
       <div class="vignette"></div>
 
       <svg class="fx" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
@@ -380,17 +377,7 @@
     g.innerHTML = parts.join("");
   })();
 
-  // --- camerabeeld refresh (optioneel; faalt stil als geen /frame.jpg) ---
-  const cam = document.getElementById("cam");
-  function refreshFrame() {
-    const url = "/frame.jpg?t=" + Date.now();
-    const img = new Image();
-    img.onload = () => { cam.src = url; cam.classList.remove("absent"); };
-    img.onerror = () => { cam.src = "/backdrop.webp"; cam.classList.add("absent"); };
-    img.src = url;
-  }
-  refreshFrame();
-  setInterval(refreshFrame, 1000);
+  // Achtergrond-canvas wordt gevuld door achtergrond.js (onderaan page).
 
   // --- helpers ---
   const DOTS_HTML = '<span class="live-dots"><i></i><i></i><i></i></span>';
@@ -506,5 +493,17 @@
     setInterval(tick, 500);
   }
 </script>
+
+<!-- Achtergrond: stippen-raster + pose-keypoints (data via websocket :8766,
+     of mock-demo met ?demo=1 of ?demo-bg=1 in URL). -->
+<script>
+  // Als ?demo=1 of ?demo-bg=1 in URL → achtergrond ook in demo-mode zetten
+  const _pBg = new URLSearchParams(location.search);
+  if (_pBg.has("demo-bg") && !_pBg.has("demo")) {
+    _pBg.set("demo", "1");
+    history.replaceState(null, "", "?" + _pBg.toString());
+  }
+</script>
+<script src="/achtergrond.js"></script>
 </body>
 </html>
