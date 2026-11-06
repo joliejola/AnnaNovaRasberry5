@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Pi-extras voor bouwplan v2 — draai dit NA scripts/pi-setup.sh.
 #
-# Installeert:
-#   - Vosk NL-small model (bouwstap 7, offline wake)
-#   - BlueZ + bleak (bouwstap 1, printer via Bluetooth)
-#   - picamera2 + Hailo deps (bouwstap 9, camera + pose)
+# Voegt toe (idempotent — veilig om nog eens te draaien):
+#   - BlueZ + bleak      → bouwstap 1, Agodeo mini-printer via Bluetooth
+#   - picamera2          → bouwstap 9, camera-capture
+#   - python-escpos      → optionele printer-fallback
 #
-# Idempotent: skipt alles wat al geïnstalleerd is. Veilig om nog eens te draaien.
+# (Vosk-model + vosk-pakket + venv + voices worden door scripts/pi-setup.sh
+# geïnstalleerd. Draai die eerst.)
 #
 # Draai:  bash scripts/pi-setup-extras.sh
 set -euo pipefail
@@ -17,47 +18,12 @@ echo "== Anna Nova bouwplan v2 — Pi-extras =="
 echo "   repo: $ROOT"
 echo
 
-# ----- 1. Vosk offline wake-model (bouwstap 7) ------------------------------
-echo "== Vosk offline wake-model =="
-VOSK_DIR="$HOME/anna-nova/models"
-VOSK_NAME="vosk-model-small-nl-0.22"
-VOSK_URL="https://alphacephei.com/vosk/models/${VOSK_NAME}.zip"
-
-mkdir -p "$VOSK_DIR"
-if [ -d "$VOSK_DIR/$VOSK_NAME" ]; then
-  echo "[vosk] model al aanwezig in $VOSK_DIR/$VOSK_NAME"
-else
-  echo "[vosk] download ${VOSK_NAME} (~42 MB)..."
-  cd "$VOSK_DIR"
-  if command -v wget >/dev/null; then
-    wget -q --show-progress "$VOSK_URL" -O "${VOSK_NAME}.zip"
-  else
-    curl -L -o "${VOSK_NAME}.zip" "$VOSK_URL"
-  fi
-  echo "[vosk] unzip..."
-  unzip -q "${VOSK_NAME}.zip"
-  rm "${VOSK_NAME}.zip"
-  cd "$ROOT"
+if [ ! -d .venv ]; then
+  echo "[fout] .venv ontbreekt — draai eerst scripts/pi-setup.sh"
+  exit 1
 fi
 
-# Vosk python pakket
-if ! "$ROOT/.venv/bin/python" -c "import vosk" 2>/dev/null; then
-  echo "[vosk] pip install vosk..."
-  "$ROOT/.venv/bin/pip" install -q vosk
-else
-  echo "[vosk] python-pakket al aanwezig."
-fi
-
-echo "[vosk] test: 1-regel wake-recognizer init..."
-"$ROOT/.venv/bin/python" - <<PYEOF
-from vosk import Model
-m = Model("$VOSK_DIR/$VOSK_NAME")
-print("  ok — model geladen")
-PYEOF
-
-echo
-
-# ----- 2. BlueZ + bleak voor printer (bouwstap 1) ---------------------------
+# ----- 1. BlueZ + bleak voor printer (bouwstap 1) ---------------------------
 echo "== Bluetooth voor Agodeo mini-printer =="
 if ! dpkg -s bluez >/dev/null 2>&1; then
   echo "[apt] bluez installeren..."
