@@ -54,8 +54,8 @@ Volg `docs/voorbereiding/PRINTER_SETUP.md`. Checklist:
 **Keuze is gemaakt:** ElevenLabs. Jolanda kiest vanavond zelf welke stem (Charlotte / Rachel / Lily / anders) in haar ElevenLabs-dashboard.
 
 Zij geeft morgen:
-- Voice-ID (string, bv `EXAVITQu4vr4xnSDxMAC`)
-- API key (`ELEVENLABS_API_KEY=sk_...`)
+- Voice-ID: **`o4g7vs6IQ4oCQwuS7wi7`** ✅ (gekozen 2026-11-06)
+- API key (`ELEVENLABS_API_KEY=sk_...`) — nog nodig
 
 Dan ik:
 - [ ] `.env` → `ELEVENLABS_API_KEY=...` + `ELEVENLABS_VOICE_ID=...`
@@ -154,6 +154,6 @@ Overwogen-maar-niet:
 ## Open punten voor Jolanda vóór morgen
 
 1. Werk `content/inhoud.json` uit — vooral `goedgekeurd: true` zetten bij quotes
-2. ElevenLabs stem kiezen (en test-zin "Snel. Dat zeggen ze allemaal." uitproberen in hun UI)
-3. Noteer voor morgen: `ELEVENLABS_VOICE_ID=...` en `ELEVENLABS_API_KEY=sk_...`
+2. ~~ElevenLabs stem kiezen~~ ✅ voice-ID `o4g7vs6IQ4oCQwuS7wi7`
+3. API key noteren voor morgen (`sk_...` uit het ElevenLabs profile)
 4. Stability + similarity-waarden uit het dashboard overnemen (default 0.5 / 0.75 werkt meestal)
