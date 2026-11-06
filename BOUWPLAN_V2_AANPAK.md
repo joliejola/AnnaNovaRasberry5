@@ -8,10 +8,11 @@ Dit document is voor vandaag. Het zegt (1) wat uit het oude plan blijft, (2) wat
 
 ## Revisie 6 nov ochtend — door Jolanda
 
-- **Wake-phrase blijft primaire trigger**. Reden: expositie met veel mensen → Anna mag niet zomaar aanslaan, moet eerst aangesproken worden ("Hoi Anna Nova" + alle fuzzy varianten).
-- **SLEEP_PHRASES blijven** ("slaap lekker", "ga maar slapen", etc.). Reden: Jolanda moet Anna midden-expositie kunnen laten zwijgen zonder stekker eruit.
+- **Wake-phrase is HET signaal, niet spreekplek-detectie of knop**. Bron 2's "RUST → OPENING zodra 2s iemand op plek staat" vervalt: Anna wordt alleen wakker als iemand haar aanspreekt met "Hoi Anna Nova" (of een fuzzy variant: "Hoi Anna", "Hallo Anna", "Word wakker Anna", en ASR-mishoor-varianten zoals "Ohana", "Yama", "Hannover"). Reden: expositie met veel mensen → Anna mag niet aanslaan op passanten. Spreekplek-detectie blijft, maar uitsluitend voor DRUK-detectie (meer dan één stem) en als filter in LUISTEREN (wie telt mee voor Mistral).
+- **SLEEP_PHRASES blijven** ("slaap lekker", "ga maar slapen", etc.) met rijke sleep_match-regel uit anna-nova.py — context-aware zodat "ik slaap slecht" niet triggert. Reden: Jolanda moet Anna midden-expositie kunnen laten zwijgen zonder stekker eruit.
 - **Foto-pijplijn**: niet slopen uit codebase. Laten staan in `vision.py` / `anna-sync.py` / `web/gallery.html`. Niet doorontwikkelen, niet opstarten in service, mogelijk later weer actief.
 - **Printer + USB wifi-dongel komen pas vanmiddag**. Volgorde omgedraaid: offline- en Pi-werk eerst, hardware-integratie na lunch.
+- **Bon-aanpassing (BM2 accepted)**: logo vervangen door B&W AI-vriendin-gezocht poster van Jolanda. "Jouw aandeel %" regel weggehaald. Commit 44220fa.
 
 ---
 
@@ -37,7 +38,7 @@ Deze stukken zijn werkend fundament uit de afgelopen week. Niet weggooien — ma
 | ReSpeaker DoA (`respeaker_doa.py`) | `anna/see.py` of apart `anna/hear.py` — richtingsbepaling | Werkt al, is kern van spreekplek-detectie |
 | VAD-throttle (silero_vad elke 128ms ipv 32ms) | `anna/hear.py` — stilte-detectie in LUISTEREN | CPU-fix 140%→20%, cruciaal voor Pi |
 | `reset_session_window()` + forget-logica bij slaap/wake | `anna/flow.py` — LOSLATEN-toestand | Dezelfde logica, meerdere triggers (6s plek leeg, BON afgerond, of SLEEP_PHRASE) |
-| **Wake-phrase ("Hoi Anna Nova" + fuzzy varianten)** | `anna/hear.py` — primaire RUST→OPENING trigger. Spreekplek-detectie blijft, maar als filter bij LUISTEREN (wie van de omstanders telt), niet om Anna wakker te maken | Veel mensen op expositie → Anna mag niet zomaar aanslaan. Behoudt variants uit huidige `.env` `WAKE_PHRASE` |
+| **Wake-phrase ("Hoi Anna Nova" + fuzzy varianten)** | `anna/hear.py` — primaire RUST→OPENING trigger, met **volledige `wake_match()` uit anna-nova.py:716** overgenomen (kent "Ohana", "Yama", "Hannover", "Word wakker Anna" etc). Spreekplek-detectie is géén wake-trigger | Veel mensen op expositie → Anna mag niet zomaar aanslaan. ASR-mishoor-varianten behouden |
 | **SLEEP_PHRASES** (`slaap lekker`, `ga maar slapen`, `welterusten`, etc.) | `anna/hear.py` — werkt in elke actieve toestand (OPENING/VRAAG/LUISTEREN/REAGEREN). Triggert direct LOSLATEN → RUST. Geen bon. | Jolanda-noodrem als Anna irritant wordt mid-expositie. Komma-lijst uit huidige `.env` wordt overgenomen |
 | `WAKE_ACK`, `SLEEP_ACK` korte bevestigingen | Blijven, uit `inhoud.json.situaties` (nieuw: `wake_ack`, `sleep_ack`) | Hoorbare bevestiging dat Anna het commando hoorde |
 | `install.sh` (systemd-unit template, model-downloads, dependencies) | Aangepaste `install.sh` — 1 service `anna-nova.service`, geen galerij-services | systemd-skelet bruikbaar, alleen inhoud wisselt |

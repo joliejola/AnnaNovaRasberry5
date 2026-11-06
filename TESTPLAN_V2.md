@@ -1,7 +1,9 @@
 # Testplan v2 — Anna Nova (bouwplan v2)
 
 *6 november 2026 · vervangt `TESTPLAN_MORGEN.md` en `CONVERSATIE_TESTPLAN.md`*
-*Revisie na Jolanda's feedback 6 nov ochtend: wake-phrase en sleep-phrases blijven; printer-tests pas vanmiddag.*
+*Revisie na Jolanda's feedback 6 nov ochtend: wake is woord (niet plek), sleep-phrases blijven; printer-tests pas vanmiddag.*
+
+**Belangrijk**: Anna reageert NOOIT op mensen die alleen op de spreekplek staan. Wake-phrase (woord) is de enige trigger. Dit is anders dan bron 2 oorspronkelijk stelde — bevestigd door Jolanda 6 nov ochtend. Spreekplek-detectie wordt gebruikt voor DRUK-detectie en LUISTEREN-filter, niet voor wake.
 
 Per bouwstap uit `BOUWPLAN_V2_AANPAK.md`: de test die Jolanda zelf uitvoert of meeleest, plus baseline-timings en een end-to-end simulatie. Zie `docs/BOUWPLAN_BRON.md` voor het bronplan.
 
@@ -311,21 +313,24 @@ Jolanda staat op 1m voor de Pi (ongeveer bij spreekplek):
 |---|---|---|
 | 1 | "Hoi Anna Nova" | WAKE → OPENING binnen 3s (Voxtral ~1s + match ~0.1s + OPENING-audio) |
 | 2 | "Hallo Anna Nova" | WAKE → OPENING |
-| 3 | "Hoi Anna" | WAKE → OPENING |
-| 4 | "Anna Nova?" | WAKE → OPENING |
-| 5 | "Oké Anna Nova" | WAKE → OPENING |
-| 6 | "Hoi Anneke" | NIET wakker (naam is niet Anna Nova) |
-| 7 | "Praat je Anna Nova?" | WAKE → OPENING (bevat de naam) |
-| 8 | "Vandaag was het mooi weer" | NIET wakker |
-| 9 | (fluistert) "hoi anna nova" | WAKE of niet — VAD-drempel vraag |
-| 10 | "hoi anna nova" (op 3m afstand) | Mogelijk wakker, mogelijk niet — hoor-radius vraag |
+| 3 | "Hoi Anna" | WAKE → OPENING (anna + hoi → groet+anna-regel) |
+| 4 | "Anna Nova?" | WAKE → OPENING (anna + nova) |
+| 5 | "Oké Anna Nova" | WAKE → OPENING (ok groet + nova) |
+| 6 | "Word wakker Anna" | WAKE → OPENING (wakker + anna) |
+| 7 | "Hoi Ohana Nova" (ASR-mishoor) | WAKE → OPENING (nova + anna-like) |
+| 8 | "Hoi Yama Nova" (ASR-mishoor) | WAKE → OPENING (nova + anna-like) |
+| 9 | "Hoi Anneke" | NIET wakker — "anneke" staat niet in anna-like |
+| 10 | "Vandaag was het mooi weer" | NIET wakker |
+| 11 | "Ik praatte vanochtend met Anna over mijn werk" | **test: mag NIET wakker worden** — "anna" alleen, zonder groet/wakker/nova |
+| 12 | (fluistert) "hoi anna nova" | WAKE of niet — VAD-drempel vraag |
 
 **Pass voor expositie-klaar**:
-- [ ] 5 van 7 "moet wakker" wakker gemaakt (ruim genoeg)
-- [ ] 0 van 2 "niet wakker" wakker gemaakt (geen false-positive)
+- [ ] 7 van 8 "moet wakker" wakker gemaakt (nrs 1-8, ruim genoeg)
+- [ ] 0 van 3 "niet wakker" wakker gemaakt (nrs 9-11, geen false-positive)
+- [ ] Nr 11 ("ik praatte vanochtend met Anna") is de KRITIEKE: ✗ zou een probleem zijn — zie fail-pad
 - [ ] Wake-ack klinkt binnen 3s na uitspraak
 
-Note Jolanda-kennis: meerdere mensen in de ruimte die niet voor Anna staan — zeggen die Anna's naam terwijl ze over haar praten → **zie 7b voor DRUK-test met Anna's naam in background chatter**.
+Note Jolanda-kennis: meerdere mensen in de ruimte die niet voor Anna staan — zeggen die Anna's naam terwijl ze over haar praten → **zie 7e voor DRUK-test met Anna's naam in background chatter**. Als Nr 11 wel wakker wordt (false-positive), moet de wake_match-regel "anna + groet" strenger: eis "anna + (nova of wakker)" of eis een duidelijke groet-aan-begin.
 
 ### Test 7b — sleep-phrase mid-gesprek
 
