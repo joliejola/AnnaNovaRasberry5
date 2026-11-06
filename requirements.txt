@@ -21,6 +21,7 @@ sounddevice>=0.4
 silero-vad>=5.0
 scipy>=1.11
 numpy>=1.26
+vosk>=0.3.45     # offline wake-detect in hear_live.WakeListener
 
 # ASR-fallback als voxtral niet lukt:
 faster-whisper>=1.0

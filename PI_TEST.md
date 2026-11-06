@@ -18,6 +18,7 @@ bash scripts/pi-setup.sh
 Het script doet:
 - `sudo apt install portaudio19-dev libsndfile1`
 - venv aanmaken + `pip install -r requirements.txt`
+- Vosk NL-small-model downloaden (~40 MB) naar `models/vosk-model-small-nl-0.22` (voor offline wake-detect)
 - 32 WAV-bestanden renderen via Piper nathalie-medium
 - Toont audio-devices
 
