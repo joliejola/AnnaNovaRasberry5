@@ -49,21 +49,22 @@ Volg `docs/voorbereiding/PRINTER_SETUP.md`. Checklist:
 
 **Timebox:** 1 uur. Als stap 2 (pairen) niet lukt → **stop**, bestel USB ESC/POS fallback.
 
-## 11:00 — Bouwstap stem: A/B tussen 3 opties
+## 11:00 — Bouwstap stem: ElevenLabs implementeren
 
-Ik render 1 gekozen zin ("Snel. Dat zeggen ze allemaal.") met:
+**Keuze is gemaakt:** ElevenLabs. Jolanda kiest vanavond zelf welke stem (Charlotte / Rachel / Lily / anders) in haar ElevenLabs-dashboard.
 
-- **A**: ElevenLabs — Charlotte / Rachel / Lily
-- **B**: Azure Neural — Fenna / Colette
-- **C**: Piper `nl_NL-mls-medium` (lokaal, andere stem dan nu)
+Zij geeft morgen:
+- Voice-ID (string, bv `EXAVITQu4vr4xnSDxMAC`)
+- API key (`ELEVENLABS_API_KEY=sk_...`)
 
-Jolanda luistert ze naast elkaar, kiest. Dan:
-- [ ] Credentials in `.env` (`ELEVENLABS_API_KEY=` of `AZURE_TTS_KEY=`)
-- [ ] `anna/speak.py` → `_say_live()` wrappen rond gekozen provider
-- [ ] Pre-renderen van alle vaste zinnen (openingen, lokzinnen, wachtzinnen, situaties, afsluiting, slotzinnen) naar `audio/*.wav` zodat latency 0 is
-- [ ] Live-TTS alleen voor `brain`-gegenereerde antwoorden
+Dan ik:
+- [ ] `.env` → `ELEVENLABS_API_KEY=...` + `ELEVENLABS_VOICE_ID=...`
+- [ ] `anna/speak.py` → `_say_live()` wrappen rond ElevenLabs API (`eleven_multilingual_v2`, stability 0.5, similarity 0.75 default)
+- [ ] `tools/render_audio.py` uitbreiden: pre-rendert alle vaste zinnen (openingen, lokzinnen, wachtzinnen, situaties, afsluiting, slotzinnen) naar `audio/*.wav` → latency 0 voor 95% van wat Anna zegt
+- [ ] Live-TTS alleen voor `brain`-gegenereerde antwoorden + quotes (die wisselen per gesprek)
+- [ ] Cache voor laatste 50 live-zinnen → als bezoeker 2x iets zelfde zegt geen nieuwe API-call
 
-**Fallback** als cloud niet werkt: Piper `nl_NL-mls-medium` lokaal.
+**Fallback** als ElevenLabs cloud wegvalt: Piper `nl_BE-nathalie-medium` (huidige, al op Pi). `.env` toggle `TTS_MODE=elevenlabs|piper`.
 
 ## 13:00 — Lunch + droogloop
 
@@ -134,24 +135,25 @@ Anna is "klaar" als dit allemaal werkt:
 
 ---
 
-## Stem-opties (korte referentie)
+## Stem: ElevenLabs
 
-Keuze morgen 11:00:
+**Gekozen:** ElevenLabs (optie 1). Jolanda kiest vanavond zelf welke stem uit haar dashboard.
 
-| # | Stem | Prijs | Latency | NL-kwaliteit |
-|---|---|---|---|---|
-| 1 | ElevenLabs Charlotte/Rachel/Lily | ~$5/mnd | 400 ms | ★★★★★ |
-| 2 | Azure `nl-NL-FennaNeural` / `ColetteNeural` | €15 / 1M chars | 500 ms | ★★★★★ |
-| 3 | OpenAI `tts-1-hd` nova / shimmer / coral | $0.015 / 1k | 700 ms | ★★★★ |
-| 4 | Piper `nl_NL-mls-medium` (offline) | gratis | 200 ms | ★★★ |
-| 5 | Coqui XTTS v2 voice cloning (offline) | gratis | 1–2 s | ★★★★ |
+- Prijs: ~$5/mnd Starter (30k chars) of $22/mnd Creator (100k chars)
+- Model: `eleven_multilingual_v2` (NL-ondersteuning)
+- Latency: 400 ms voor live-zinnen; 0 ms voor pre-gerenderde vaste zinnen
 
-Pre-renderen van vaste zinnen = 0 ms latency voor 95% van wat Anna zegt — dus cloud is zonder zorg.
+Overwogen-maar-niet:
+- Azure Neural Fenna/Colette — iets minder expressief
+- OpenAI nova/shimmer — meer accent
+- Piper lokaal — blijft als fallback
+- XTTS voice cloning — te zwaar op Pi 5
 
 ---
 
 ## Open punten voor Jolanda vóór morgen
 
 1. Werk `content/inhoud.json` uit — vooral `goedgekeurd: true` zetten bij quotes
-2. Keuze: wil je dat Jolanda-stem gekloond wordt (optie 5) of liever een studio-stem (1 of 2)?
-3. Thuisgebruik: zet alvast ELEVENLABS/AZURE account aan als dat eenvoudig kan
+2. ElevenLabs stem kiezen (en test-zin "Snel. Dat zeggen ze allemaal." uitproberen in hun UI)
+3. Noteer voor morgen: `ELEVENLABS_VOICE_ID=...` en `ELEVENLABS_API_KEY=sk_...`
+4. Stability + similarity-waarden uit het dashboard overnemen (default 0.5 / 0.75 werkt meestal)
