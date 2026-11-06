@@ -140,23 +140,13 @@
   }
 
   function tekenPose(pts) {
-    ctx.strokeStyle = "rgba(220, 220, 220, 0.65)";
-    ctx.lineWidth = 2;
-    for (const [a, b] of EDGES) {
-      const pa = pts[a], pb = pts[b];
-      if (!pa || !pb) continue;
-      if ((pa[2] || 0) < 0.3 || (pb[2] || 0) < 0.3) continue;
-      ctx.beginPath();
-      ctx.moveTo(pa[0] * canvas.width, pa[1] * canvas.height);
-      ctx.lineTo(pb[0] * canvas.width, pb[1] * canvas.height);
-      ctx.stroke();
-    }
-    // keypoint-stippen
-    ctx.fillStyle = "rgba(244, 184, 96, 0.8)";  // goud-accent
+    // Geen lijnen tussen keypoints — alleen de gouden stippen zelf.
+    // (Skelet-visualisatie oogde als een "poppetje" wat te letterlijk was.)
+    ctx.fillStyle = "rgba(244, 184, 96, 0.85)";  // goud-accent
     for (const p of pts) {
       if (!p || (p[2] || 0) < 0.3) continue;
       ctx.beginPath();
-      ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 3, 0, Math.PI * 2);
+      ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
