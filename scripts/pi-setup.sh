@@ -14,12 +14,33 @@ echo "   repo: $ROOT"
 echo
 
 # 1. apt deps voor sounddevice/piper
-if ! dpkg -s portaudio19-dev >/dev/null 2>&1; then
-  echo "[apt] portaudio19-dev + libsndfile1 installeren..."
+# pipewire-alsa is ESSENTIEEL: zonder is PortAudio blind voor USB-mics op Pi 5
+# Bookworm/Trixie (zelfs al ziet arecord ze wel).
+APT_PKGS="portaudio19-dev libsndfile1 pipewire-alsa"
+MISSING=""
+for p in $APT_PKGS; do
+  dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"
+done
+if [ -n "$MISSING" ]; then
+  echo "[apt] installeren:$MISSING"
   sudo apt-get update -qq
-  sudo apt-get install -y portaudio19-dev libsndfile1
+  sudo apt-get install -y $MISSING
 else
-  echo "[apt] portaudio19-dev al geïnstalleerd."
+  echo "[apt] portaudio19-dev + pipewire-alsa al geïnstalleerd."
+fi
+
+# 1b. oude anna-nova.service stoppen (als die van main-branch draait)
+if systemctl is-active --quiet anna-nova.service 2>/dev/null; then
+  echo "[systemd] oude anna-nova.service stop (gebruikte mic voor oude code)"
+  sudo systemctl stop anna-nova.service
+  sudo systemctl disable anna-nova.service
+fi
+
+# 1c. ~/.asoundrc met custom-config kan aplay breken onder pipewire-alsa.
+# Als die bestaat en niet door user zelf geschreven: verplaatsen.
+if [ -f ~/.asoundrc ] && ! grep -q "USER-MANAGED" ~/.asoundrc 2>/dev/null; then
+  echo "[alsa] ~/.asoundrc verplaatsen naar ~/.asoundrc.pre-bouwplan"
+  mv ~/.asoundrc ~/.asoundrc.pre-bouwplan
 fi
 
 # 2. venv
