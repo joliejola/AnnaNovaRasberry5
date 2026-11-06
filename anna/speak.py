@@ -1,11 +1,21 @@
 """Spreken — speelt vaste audio of live TTS af.
 
 Droogloop-modus: print naar stdout + simuleert duur (sleep).
-Live-modus: cascade: audio/<id>.wav (vooraf gerenderd) → live Piper TTS → stil.
+Live-modus cascade:
+  1. audio/<id>.wav (vooraf gerenderd, 0 ms latency)
+  2. ElevenLabs stream → mpg123 (als TTS_MODE=elevenlabs + API-key gezet)
+  3. Piper lokaal → aplay (fallback bij netwerk-uitval)
 
-Afspelen gaat via `aplay` of `paplay`; eerste gevonden wint.
-Env: PIPER_BIN (default .venv/bin/piper of PATH), PIPER_VOICE (.onnx-pad),
-AUDIO_OUTPUT_DEVICE (voor aplay ALSA-device-string, default 'default').
+Env:
+  TTS_MODE               elevenlabs | piper   (default piper)
+  ELEVENLABS_API_KEY     sk_...
+  ELEVENLABS_VOICE_ID    bv o4g7vs6IQ4oCQwuS7wi7
+  ELEVENLABS_MODEL       eleven_multilingual_v2
+  ELEVENLABS_STABILITY   0.5
+  ELEVENLABS_SIMILARITY  0.75
+  PIPER_BIN              .venv/bin/piper of PATH
+  PIPER_VOICE            .onnx-pad
+  AUDIO_OUTPUT_DEVICE    ALSA-device-string voor aplay (default 'default')
 """
 from __future__ import annotations
 
@@ -29,6 +39,15 @@ _SIM_FACTOR = float(os.environ.get("DROOGLOOP_SIM", "0.2"))
 
 AUDIO_OUT = os.environ.get("AUDIO_OUTPUT_DEVICE", "default")
 PIPER_VOICE = Path(os.environ.get("PIPER_VOICE", "")) if os.environ.get("PIPER_VOICE") else DEFAULT_VOICE
+
+TTS_MODE = os.environ.get("TTS_MODE", "piper").lower()
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "")
+ELEVENLABS_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+ELEVENLABS_STABILITY = float(os.environ.get("ELEVENLABS_STABILITY", "0.5"))
+ELEVENLABS_SIMILARITY = float(os.environ.get("ELEVENLABS_SIMILARITY", "0.75"))
+ELEVENLABS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}/stream"
+ELEVENLABS_TIMEOUT = float(os.environ.get("ELEVENLABS_TIMEOUT_S", "8.0"))
 
 
 def _duur_schatting(tekst: str) -> float:
@@ -57,19 +76,96 @@ def say(tekst: str, audio_id: str | None = None, blocking: bool = True) -> None:
 
 
 def _say_live(tekst: str, audio_id: str | None, blocking: bool) -> None:
-    # 1. vooraf gerenderd WAV
+    # 1. vooraf gerenderd WAV (komt later; nu nog niet)
     if audio_id:
         wav = AUDIO_DIR / f"{audio_id}.wav"
         if wav.exists():
             _play_wav(wav, blocking=blocking)
             return
-        log.warning("[speak] audio/%s.wav ontbreekt — val terug op live-TTS", audio_id)
+        log.debug("[speak] audio/%s.wav ontbreekt — live-TTS", audio_id)
 
-    # 2. live Piper TTS
+    # 2. ElevenLabs (als geconfigureerd)
+    if TTS_MODE == "elevenlabs" and ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
+        if _say_elevenlabs_live(tekst, blocking=blocking):
+            return
+        log.warning("[speak] ElevenLabs faalt — fallback Piper")
+
+    # 3. live Piper TTS (fallback)
     try:
         _say_piper_live(tekst, blocking=blocking)
     except Exception as e:
         log.error("[speak] live Piper faalt: %s", e)
+
+
+def _say_elevenlabs_live(tekst: str, blocking: bool = True) -> bool:
+    """Stream ElevenLabs MP3 → mpg123. Return True op succes, False bij
+    netwerkfout / ontbrekende binary → caller valt terug op Piper."""
+    try:
+        import requests  # lazy — droogloop werkt zonder
+    except ImportError:
+        log.error("[speak] python-requests ontbreekt")
+        return False
+
+    mpg = shutil.which("mpg123")
+    if not mpg:
+        log.error("[speak] mpg123 niet gevonden — sudo apt install mpg123")
+        return False
+
+    url = ELEVENLABS_URL.format(voice=ELEVENLABS_VOICE_ID)
+    try:
+        r = requests.post(
+            url,
+            headers={
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Accept": "audio/mpeg",
+                "Content-Type": "application/json",
+            },
+            json={
+                "text": tekst,
+                "model_id": ELEVENLABS_MODEL,
+                "voice_settings": {
+                    "stability": ELEVENLABS_STABILITY,
+                    "similarity_boost": ELEVENLABS_SIMILARITY,
+                    "use_speaker_boost": True,
+                },
+            },
+            stream=True,
+            timeout=ELEVENLABS_TIMEOUT,
+        )
+    except Exception as e:
+        log.error("[speak] ElevenLabs HTTP faalt: %s", e)
+        return False
+
+    if r.status_code != 200:
+        log.error("[speak] ElevenLabs HTTP %d: %s", r.status_code, r.text[:200])
+        return False
+
+    try:
+        proc = subprocess.Popen(
+            [mpg, "-q", "-"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        log.error("[speak] mpg123 start faalt: %s", e)
+        return False
+
+    try:
+        for chunk in r.iter_content(chunk_size=4096):
+            if chunk:
+                proc.stdin.write(chunk)
+        proc.stdin.close()
+        if blocking:
+            proc.wait(timeout=30)
+        return True
+    except Exception as e:
+        log.error("[speak] stream naar mpg123 faalt: %s", e)
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return False
 
 
 def _player_bin() -> list[str] | None:

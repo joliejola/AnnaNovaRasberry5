@@ -33,6 +33,15 @@ else
   echo "[apt] bluez al aanwezig."
 fi
 
+# ----- mpg123 voor ElevenLabs MP3-stream in speak.py ------------------------
+echo "== mpg123 voor ElevenLabs-stream =="
+if ! dpkg -s mpg123 >/dev/null 2>&1; then
+  echo "[apt] mpg123 installeren..."
+  sudo apt-get install -y mpg123
+else
+  echo "[apt] mpg123 al aanwezig."
+fi
+
 # bleak is Python-only, pure userland
 if ! "$ROOT/.venv/bin/python" -c "import bleak" 2>/dev/null; then
   echo "[bleak] pip install bleak..."
