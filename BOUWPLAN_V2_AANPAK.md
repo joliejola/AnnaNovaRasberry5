@@ -97,7 +97,8 @@ Veel minder dan vorige lijst van 9 — vaste reeks betekent minder keuzes.
 
 - 🔔 **BM1 (nu)** — Dit nieuwe bouwplan OK? Vooral: akkoord met 5 vaste vragen (geen trekking)?
 - 🔔 **BM2 (bon)** — gedaan, commit 44220fa (jij vond mooi)
-- 🔔 **BM3** (~16:00) — droogloop 5 gesprekken met nieuwe reeks. Voelt het? + stem-sample van render_audio klinkt goed?
+- 🔔 **BM3 (stem)** — gedaan 6 nov 15:30: **nathalie-medium NL-BE** definitief. Vergeleken met mls_5809, mls_7432, rdh-medium, rdh-x_low.
+- 🔔 **BM3b** (~16:00) — droogloop 5 gesprekken met nieuwe reeks. Voelt het?
 - 🔔 **BM4** (~17:30) — wake-test ruimte: 10× "Hoi Anna Nova" vs 10 min achtergrond-praten
 - 🔔 **BM5** (~18:00) — 6 states op scherm
 - 🔔 **BM6** (~18:30) — groepstest-drempels (vals-positief vs gemist)
