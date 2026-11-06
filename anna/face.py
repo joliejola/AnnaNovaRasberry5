@@ -8,13 +8,11 @@ Bron 2 noemt websocket maar HTTP-polling is pragmatisch:
 - geen extra dependency (stdlib only)
 - werkt met bestaande face.html-structuur
 
-Mapping flow-toestanden → scherm:
+Mapping flow-toestanden → scherm (6 states, bron 2 sync 6 nov 14:50):
   RUST, LOSLATEN           → "rust"
   OPENING, VRAAG, ZACHT    → "spreekt"
   LUISTEREN, STIL, RUIS    → "luistert"
   REAGEREN                 → "denkt"
-  DRUK                     → "luistert"   (korte overgang, dan knopmodus)
-  KNOPMODUS                → "knopmodus"
   AFSLUITING               → "afrekenen"
   BON                      → "print"
 """
@@ -43,8 +41,6 @@ FLOW_TO_SCHERM = {
     "LUISTEREN": "luistert",
     "STIL": "luistert",
     "RUIS": "luistert",
-    "DRUK": "luistert",
-    "KNOPMODUS": "knopmodus",
     "REAGEREN": "denkt",
     "AFSLUITING": "afrekenen",
     "BON": "print",

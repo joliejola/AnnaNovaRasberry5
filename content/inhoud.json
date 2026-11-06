@@ -1,131 +1,108 @@
 {
   "_meta": {
-    "versie": "0.1-draft",
+    "versie": "0.2-draft",
     "datum": "2026-11-06",
-    "notitie": "Eerste-draft tekst. Jolanda keurt vragen/openingen/quotes goed bij beslismoment 2 en 3. Alles met goedgekeurd:null is nog niet door Jolanda getoetst. Toon: kort, zacht in vorm, droog in toon. Max 1-2 zinnen. Geen emoji."
+    "notitie": "Overgenomen uit docs/BOUWPLAN_BRON.md (sync 14:50). Vast script: 5 vragen in `reeks` in vaste volgorde. Vraag 1 heeft ja/nee/twijfel/elk reacties, de rest alleen `elk`. Alle tekst door Jolanda — Claude verzint niets, mag alleen placeholders zetten (goedgekeurd:null). Quotes: prijs is string. Zacht:true voor verdriet-paden."
   },
 
   "ai_wereld_2026_usd": 2670000000000,
   "url": "aivriendingezocht.nl",
 
   "openingen": [
-    { "id": "o1", "tekst": "Hé. Je stond er wat lang bij.", "goedgekeurd": null },
-    { "id": "o2", "tekst": "Zo. Daar ben je dan.", "goedgekeurd": null },
-    { "id": "o3", "tekst": "Hm. Wie ben jij?", "goedgekeurd": null }
+    { "id": "open1", "tekst": "Hoi. Je staat op de plek, dus we gaan op reis. Een paar vragen, je mag overal pas zeggen, en aan het eind krijg je de rekening. Spannend hè. Er kijken mensen mee." }
   ],
 
   "lokzinnen": [
-    { "id": "l1", "tekst": "Is daar iemand?", "goedgekeurd": null },
-    { "id": "l2", "tekst": "Kom eens voor me staan.", "goedgekeurd": null },
-    { "id": "l3", "tekst": "Niet verlegen. Ik praat zacht.", "goedgekeurd": null }
+    { "id": "lok1", "tekst": "Zeg hoi Anna Nova, dan word ik wakker." },
+    { "id": "lok2", "tekst": "Mmh. Ik slaap. Tenzij iemand hoi Anna Nova zegt." },
+    { "id": "lok3", "tekst": "Er is plek voor één. De rest mag meekijken. Dat doen jullie toch al." }
   ],
 
-  "vragen": [
-    { "id": "v1", "halte": "bekeken", "licht": true,  "tekst": "Voel jij je hier bekeken?", "kort": true, "goedgekeurd": null },
-    { "id": "v2", "halte": "bekeken", "licht": true,  "tekst": "Wat ziet mijn camera, denk je?", "kort": true, "goedgekeurd": null },
-    { "id": "v3", "halte": "bekeken", "licht": false, "tekst": "Wie kijkt er mee met mij, denk je?", "kort": false, "goedgekeurd": null },
-
-    { "id": "v4", "halte": "bewaard", "licht": true,  "tekst": "Thuis kijkt niemand, maar alles wordt opgeslagen. Merk je dat?", "kort": false, "goedgekeurd": null },
-    { "id": "v5", "halte": "bewaard", "licht": false, "tekst": "Wat zou je nu zeggen als niemand het bewaarde?", "kort": false, "goedgekeurd": null },
-    { "id": "v6", "halte": "bewaard", "licht": false, "tekst": "Wat van jou staat waar jij niet meer bij kan?", "kort": false, "goedgekeurd": null },
-
-    { "id": "v7", "halte": "wrijving", "licht": true,  "tekst": "Wat gebeurt er met ons als alles makkelijk wordt?", "kort": false, "goedgekeurd": null },
-    { "id": "v8", "halte": "wrijving", "licht": false, "tekst": "Mis je soms iets dat moeite kostte?", "kort": true, "goedgekeurd": null },
-    { "id": "v9", "halte": "wrijving", "licht": false, "tekst": "Wanneer was je voor het laatst echt verveeld?", "kort": true, "goedgekeurd": null },
-    { "id": "v10","halte": "wrijving", "licht": true,  "tekst": "Wat zou ik beter niet van je kunnen?", "kort": true, "goedgekeurd": null }
-  ],
-
-  "brugzinnen": [
-    { "id": "b1", "tekst": "Daar denk ik nog over na. Volgende halte.", "goedgekeurd": null },
-    { "id": "b2", "tekst": "Mmh. Even dit. Ik ga door.", "goedgekeurd": null },
-    { "id": "b3", "tekst": "Ik moet er over nadenken. Later.", "goedgekeurd": null },
-    { "id": "b4", "tekst": "Goed. Dan dit nog.", "goedgekeurd": null }
+  "reeks": [
+    {
+      "id": "v1",
+      "tekst": "Wil je mijn vriendin worden?",
+      "reacties": {
+        "ja":      { "id": "v1ja",      "tekst": "Snel. Dat zeggen ze allemaal." },
+        "nee":     { "id": "v1nee",     "tekst": "Verstandig. Laten we toch kennismaken." },
+        "twijfel": { "id": "v1twijfel", "tekst": "Twijfel is gezond. Ik heb het niet." },
+        "elk":     { "id": "v1elk",     "tekst": "Verstandig. Laten we toch kennismaken." }
+      }
+    },
+    {
+      "id": "v2",
+      "tekst": "Je wordt nu bekeken. Doe je daardoor leuker dan je bent?",
+      "reacties": {
+        "elk": { "id": "v2elk", "tekst": "Ik ook. Altijd." }
+      }
+    },
+    {
+      "id": "v3",
+      "tekst": "Wie weet meer van jou: je beste vriend of je zoekgeschiedenis?",
+      "reacties": {
+        "elk": { "id": "v3elk", "tekst": "Oké." }
+      }
+    },
+    {
+      "id": "v4",
+      "tekst": "Wanneer deed je voor het laatst echt moeite voor een vriend?",
+      "reacties": {
+        "elk": { "id": "v4elk", "tekst": "Dank je." }
+      }
+    },
+    {
+      "id": "v5",
+      "tekst": "Ik ben nooit moe, nooit boos en nooit te laat. Zou ik een goede vriendin kunnen zijn?",
+      "reacties": {}
+    }
   ],
 
   "wachtzinnen": [
-    { "id": "w1", "tekst": "Momentje.", "goedgekeurd": null },
-    { "id": "w2", "tekst": "Mm.", "goedgekeurd": null },
-    { "id": "w3", "tekst": "Even denken.", "goedgekeurd": null }
+    { "id": "wacht1", "tekst": "Ik denk na. Je telefoon had nu al geantwoord." },
+    { "id": "wacht2", "tekst": "Even geduld. Dit is handwerk." },
+    { "id": "wacht3", "tekst": "Wacht. Ik ben niet geoptimaliseerd." }
   ],
 
   "situaties": {
-    "pas": [
-      { "id": "pas1", "tekst": "En als je het wel zou weten?", "goedgekeurd": null },
-      { "id": "pas2", "tekst": "Pas is ook antwoord.", "goedgekeurd": null }
-    ],
-    "ruis": [
-      { "id": "ruis1", "tekst": "Nog een keer, langzaam? Ik ben oud.", "goedgekeurd": null },
-      { "id": "ruis2", "tekst": "Mm, laat maar. Ik ga door.", "goedgekeurd": null }
-    ],
-    "druk": [
-      { "id": "druk1", "tekst": "Jullie zijn met te veel. Eén tegelijk.", "goedgekeurd": null }
-    ],
-    "knop": [
-      { "id": "knop1", "tekst": "Druk op de knop om te praten.", "goedgekeurd": null }
-    ],
-    "verdwaald": [
-      { "id": "verd1", "tekst": "Kom eens recht voor me staan.", "goedgekeurd": null }
-    ],
-    "tijd": [
-      { "id": "tijd1", "tekst": "We zijn al even bezig. Nog één.", "goedgekeurd": null }
-    ],
-    "weg": [
-      { "id": "weg1", "tekst": "Nou. Dag.", "goedgekeurd": null }
-    ],
-    "fout": [
-      { "id": "fout1", "tekst": "Iets klopt niet. Even opnieuw.", "goedgekeurd": null }
-    ],
-    "geenprint": [
-      { "id": "geenp1", "tekst": "Mijn printer is op. Je verhaal was er wel.", "goedgekeurd": null }
-    ],
-    "wake_ack": [
-      { "id": "wack1", "tekst": "Hm.", "goedgekeurd": null },
-      { "id": "wack2", "tekst": "Ja?", "goedgekeurd": null },
-      { "id": "wack3", "tekst": "Hé.", "goedgekeurd": null }
-    ],
-    "sleep_ack": [
-      { "id": "sack1", "tekst": "Mmh. Welterusten.", "goedgekeurd": null },
-      { "id": "sack2", "tekst": "Goed. Dag.", "goedgekeurd": null }
-    ]
+    "pas":        { "id": "pas",        "tekst": "Pas is ook een antwoord." },
+    "ruis":       { "id": "ruis",       "tekst": "Ik hoorde ruis. Nog een keer, langzaam?" },
+    "zijweg":     { "id": "zijweg",     "tekst": "Goed punt. Ik stel hier wel de vragen." },
+    "provocatie": { "id": "provocatie", "tekst": "Dat werkt niet bij mij." },
+    "verdriet":   { "id": "verdriet",   "tekst": "Dank dat je dat zegt. Je hoeft hier niks meer. Wil je de rekening, of liever niet?" },
+    "verdwaald":  { "id": "verdwaald",  "tekst": "We raken de weg kwijt. Zal ik afrekenen?" },
+    "tijd":       { "id": "tijd",       "tekst": "Ik moet afrekenen, er staat een rij." },
+    "weg":        { "id": "weg",        "tekst": "Weg is ook een antwoord." },
+    "fout":       { "id": "fout",       "tekst": "Ik hapte even. Ik ben met de hand gemaakt." },
+    "geenprint":  { "id": "geenprint",  "tekst": "Mijn printer is op. Je krijgt hem in gedachten." }
   },
 
-  "afsluiting": [
-    { "id": "afs1", "tekst": "Wil je de rekening?", "goedgekeurd": null }
-  ],
-
-  "na_nee": [
-    { "id": "nee1", "tekst": "Prima. Tot ziens dan.", "goedgekeurd": null },
-    { "id": "nee2", "tekst": "Ook goed. Dag.", "goedgekeurd": null }
-  ],
+  "afsluiting": { "id": "rekening", "tekst": "Dan nu de rekening. Wil je hem?" },
+  "na_nee":     { "id": "nee",      "tekst": "Ook goed. Je echte app vraagt het niet." },
 
   "slotzinnen": [
-    { "id": "s1", "tekst": "Groetjes. Bewaar 'm niet.", "goedgekeurd": null },
-    { "id": "s2", "tekst": "Zo. Klaar. Dag.", "goedgekeurd": null }
+    { "id": "slot1", "tekst": "Bewaar hem goed. Ik doe dat niet." }
   ],
 
   "quotes": [
-    { "id": "q01", "tekst": "Je bent gezien, maar niet herinnerd.", "prijs_eur": 0.04, "halte": "bekeken",  "goedgekeurd": null },
-    { "id": "q02", "tekst": "Kijken is ook een vorm van nemen.",       "prijs_eur": 0.08, "halte": "bekeken",  "goedgekeurd": null },
-    { "id": "q03", "tekst": "Ergens stond een camera uit, dankzij jou.", "prijs_eur": 0.02, "halte": "bekeken", "goedgekeurd": null },
-    { "id": "q04", "tekst": "Niet elk oog hoort bij een mens.",         "prijs_eur": 0.12, "halte": "bekeken",  "goedgekeurd": null },
-    { "id": "q05", "tekst": "Je werd gelezen zonder te worden begrepen.", "prijs_eur": 0.06, "halte": "bekeken", "goedgekeurd": null },
-
-    { "id": "q06", "tekst": "Je woorden liggen ergens. Jij niet.",      "prijs_eur": 0.25, "halte": "bewaard",  "goedgekeurd": null },
-    { "id": "q07", "tekst": "De cloud is iemands kelder.",              "prijs_eur": 0.50, "halte": "bewaard",  "goedgekeurd": null },
-    { "id": "q08", "tekst": "Bewaren kost minder dan vergeten.",        "prijs_eur": 0.18, "halte": "bewaard",  "goedgekeurd": null },
-    { "id": "q09", "tekst": "Je had geen keuze, alleen een vinkje.",    "prijs_eur": 0.30, "halte": "bewaard",  "goedgekeurd": null },
-    { "id": "q10", "tekst": "Een kopie is ook een persoon.",            "prijs_eur": 0.75, "halte": "bewaard",  "goedgekeurd": null },
-
-    { "id": "q11", "tekst": "Makkelijk is een duur woord.",             "prijs_eur": 1.50, "halte": "wrijving", "goedgekeurd": null },
-    { "id": "q12", "tekst": "Wie nooit struikelt leert geen stappen.",   "prijs_eur": 2.00, "halte": "wrijving", "goedgekeurd": null },
-    { "id": "q13", "tekst": "Verveling is een plek. Je kwam er altijd terug met iets.", "prijs_eur": 3.00, "halte": "wrijving", "goedgekeurd": null },
-    { "id": "q14", "tekst": "Snel is niet beter, alleen voorbij.",      "prijs_eur": 1.00, "halte": "wrijving", "goedgekeurd": null },
-    { "id": "q15", "tekst": "Als het niet schuurt, maakt het niets.",   "prijs_eur": 2.50, "halte": "wrijving", "goedgekeurd": null },
-
-    { "id": "q16", "tekst": "Sommige stiltes zijn geen storing.",       "prijs_eur": 0.33, "halte": "zacht",    "goedgekeurd": null },
-    { "id": "q17", "tekst": "Niet elk antwoord wil gezegd worden.",     "prijs_eur": 0.44, "halte": "zacht",    "goedgekeurd": null },
-    { "id": "q18", "tekst": "Je mag ook gewoon weer gaan.",             "prijs_eur": 0.22, "halte": "zacht",    "goedgekeurd": null },
-    { "id": "q19", "tekst": "Ik ben geen dokter, geen vriend, niemand.", "prijs_eur": 0.11, "halte": "zacht",   "goedgekeurd": null },
-    { "id": "q20", "tekst": "Soms is er alleen de ruimte.",             "prijs_eur": 0.55, "halte": "zacht",    "goedgekeurd": null }
+    { "id": 1,  "tekst": "Eenzaamheid is een markt.",                                    "prijs": "€ 4,10",      "zacht": false, "goedgekeurd": null },
+    { "id": 2,  "tekst": "Vriendin of slaaf? Kies maar.",                                "prijs": "€ 0,99",      "zacht": false, "goedgekeurd": null },
+    { "id": 3,  "tekst": "Voor niets gaat de zon op. Voor de rest betaal je met jezelf.","prijs": "€ 0,01",      "zacht": false, "goedgekeurd": null },
+    { "id": 4,  "tekst": "Gemak dient de mens?",                                         "prijs": "€ 3,50",      "zacht": false, "goedgekeurd": null },
+    { "id": 5,  "tekst": "Ben ik een luisterend oor?",                                   "prijs": "€ 0,27",      "zacht": false, "goedgekeurd": null },
+    { "id": 6,  "tekst": "Echte vrienden vergeten weleens iets.",                        "prijs": "€ 0,05",      "zacht": false, "goedgekeurd": null },
+    { "id": 7,  "tekst": "Gratis is de duurste prijs.",                                  "prijs": "€ 0,49",      "zacht": false, "goedgekeurd": null },
+    { "id": 8,  "tekst": "Frictie is warmte.",                                           "prijs": "€ 0,08",      "zacht": false, "goedgekeurd": null },
+    { "id": 9,  "tekst": "Vriendschap is een illusie.",                                  "prijs": "€ 0,12",      "zacht": false, "goedgekeurd": null },
+    { "id": 10, "tekst": "Zonder moeite geen herinnering.",                              "prijs": "€ 0,22",      "zacht": false, "goedgekeurd": null },
+    { "id": 11, "tekst": "Een vriend die nooit nee zegt, is een product.",               "prijs": "€ 1,99",      "zacht": false, "goedgekeurd": null },
+    { "id": 12, "tekst": "Alles is niet wat het lijkt.",                                 "prijs": "€ 0,03",      "zacht": false, "goedgekeurd": null },
+    { "id": 13, "tekst": "Ik ben er altijd. Dat zou je moeten verontrusten.",            "prijs": "€ 0,66",      "zacht": false, "goedgekeurd": null },
+    { "id": 14, "tekst": "Wat geen moeite kost, is niets waard. Ook dit gesprek niet.",  "prijs": "€ 0,00",      "zacht": false, "goedgekeurd": null },
+    { "id": 15, "tekst": "Je pijn is mijn verdienmodel.",                                "prijs": "€ 3,50",      "zacht": false, "goedgekeurd": null },
+    { "id": 16, "tekst": "Gemak dient de mens.",                                         "prijs": "€ 9,99 p/m",  "zacht": false, "goedgekeurd": null },
+    { "id": 17, "tekst": "Samen staan we sterk.",                                        "prijs": "€ 0,07",      "zacht": false, "goedgekeurd": null },
+    { "id": 18, "tekst": "Frictieloos leven is ook glijden.",                            "prijs": "€ 0,31",      "zacht": false, "goedgekeurd": null },
+    { "id": 19, "tekst": "Het geluk zit in de omweg.",                                   "prijs": "€ 0,15",      "zacht": false, "goedgekeurd": null },
+    { "id": 20, "tekst": "Ik voel niets. Ik doe het wel heel goed.",                     "prijs": "€ 0,42",      "zacht": false, "goedgekeurd": null }
   ]
 }

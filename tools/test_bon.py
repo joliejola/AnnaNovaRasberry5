@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Render 5 voorbeeldbonnen uit content/inhoud.json voor Jolanda.
-
-Beslismoment 2 in bouwplan-v2: Jolanda bekijkt de PNG's en checkt:
-- Logo + "AI VRIENDIN GEZOCHT" leesbaar?
-- Quote past, lay-out klopt?
-- Prijs-plakking en percentage-notatie OK?
-- Datum NL, URL, afzenders staan correct onderaan?
+"""Render voorbeeldbonnen uit content/inhoud.json voor Jolanda.
 
 Draai: python3 tools/test_bon.py
-Output: ./out/bon_01.png t/m bon_05.png
+Output: ./out/bon_*.png
+
+Rendert:
+- 5 gewone bonnen met verschillende quote-ids
+- 1 "verdriet"-pad: lege bon (€ 0,00) omdat er geen zacht:true quotes zijn
 """
 from __future__ import annotations
 
-import random
 import sys
 from datetime import date
 from pathlib import Path
@@ -28,8 +25,7 @@ OUT.mkdir(exist_ok=True)
 inhoud = bon.laad_inhoud()
 
 
-def render_specifiek(idx: int, quote_id: str, halte_log: list[str], soort: str | None, tag: str):
-    """Geef een quote mee om deterministisch 5 verschillende bonnen te krijgen."""
+def render_met_quote(idx: int, quote_id: int, tag: str):
     quote = next(q for q in inhoud["quotes"] if q["id"] == quote_id)
     img = bon.render_bon(
         quote=quote,
@@ -40,34 +36,23 @@ def render_specifiek(idx: int, quote_id: str, halte_log: list[str], soort: str |
     )
     pad = OUT / f"bon_{idx:02d}_{tag}.png"
     img.save(pad)
-    pct = bon.format_percentage(quote["prijs_eur"], inhoud["ai_wereld_2026_usd"])
-    prijs = bon.format_prijs(quote["prijs_eur"])
-    print(f"  bon_{idx:02d}_{tag}: {quote['id']} halte={quote['halte']} prijs={prijs} pct={pct}%")
-    print(f"           quote: {quote['tekst']!r}")
-    print(f"           PNG:   {pad}")
+    print(f"  bon_{idx:02d}_{tag}: q{quote['id']} prijs={quote['prijs']!r}")
+    print(f"           {quote['tekst']!r}")
 
 
-print("Rendert 5 voorbeeldbonnen voor beslismoment 2...\n")
+print("Rendert voorbeeldbonnen voor beslismoment 2 (nieuwe schema)...\n")
 
-# 1 — bekeken, goedkope quote (percentage zeer klein)
-render_specifiek(1, "q01", ["bekeken", "bekeken", "bewaard"], None, "bekeken_laag")
+render_met_quote(1, 2,  "vriendin_of_slaaf")   # € 0,99
+render_met_quote(2, 14, "nulbon_moeite")        # € 0,00 — randgeval
+render_met_quote(3, 16, "gemak_abo_per_maand")  # € 9,99 p/m
+render_met_quote(4, 11, "vriend_zonder_nee")    # € 1,99
+render_met_quote(5, 1,  "eenzaamheid_markt")    # € 4,10
 
-# 2 — bewaard, middel prijs
-render_specifiek(2, "q07", ["bewaard", "bewaard", "wrijving"], None, "bewaard_midden")
+# Verdriet-pad: geen zacht:true quotes → lege bon met € 0,00
+print("\nVerdriet-pad (geen zacht:true in deze inhoud.json):")
+img, q = bon.maak_bon(inhoud, soort_laatste="verdriet")
+pad = OUT / "bon_06_verdriet_leeg.png"
+img.save(pad)
+print(f"  bon_06_verdriet_leeg: quote.id={q['id']} prijs={q['prijs']!r} tekst={q['tekst']!r}")
 
-# 3 — wrijving, duurdere quote (percentage merkbaar groter)
-render_specifiek(3, "q13", ["wrijving", "wrijving", "bekeken"], None, "wrijving_duur")
-
-# 4 — zacht, na verdriet-soort
-render_specifiek(4, "q17", ["bekeken", "bewaard"], "verdriet", "zacht_na_verdriet")
-
-# 5 — langere quote (test tekst-wrap)
-render_specifiek(5, "q13", ["wrijving"], None, "lange_quote_wrap")
-
-print("\nKlaar. Open de PNG's in", OUT)
-
-# Verificatie percentage-berekening (bron 2 noemt specifieke voorbeelden)
-print("\n--- percentage-verificatie (bron 2 referenties) ---")
-for prijs in [0.04, 0.25, 1.50, 9.99, 0.00]:
-    pct = bon.format_percentage(prijs, inhoud["ai_wereld_2026_usd"])
-    print(f"  €{prijs:>5.2f} → {pct} %")
+print("\nKlaar. Open PNG's in", OUT)

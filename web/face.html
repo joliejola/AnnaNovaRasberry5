@@ -137,15 +137,6 @@
       100% { opacity: 0.65; }
     }
 
-    /* KNOPMODUS — donker-blauw, rustig, geen puls. Grote tekst wordt in HTML gezet. */
-    body.state-knopmodus .vignette {
-      background:
-        radial-gradient(ellipse 60% 60% at 50% 50%,
-          rgba(20,40,70,0.65) 0%,
-          rgba(10,25,50,0.85) 55%,
-          rgba(5,12,25,1) 100%);
-    }
-
     /* OFFLINE — rood, voor fetch-fouten */
     body.state-offline .vignette {
       background:
@@ -193,16 +184,6 @@
     }
     .line.visitor .text { color: #fff5ea; font-weight: 300; opacity: 0.88; }
     .line.anna    .text { color: #fdeecf; font-weight: 500; }
-
-    /* Knopmodus: visitor-regel weg, Anna-regel wordt de grote instructie */
-    body.state-knopmodus .line.visitor { display: none; }
-    body.state-knopmodus .line.anna .text {
-      font-size: 10vmin;
-      font-weight: 600;
-      color: #ffffff;
-      letter-spacing: -0.02em;
-      text-shadow: 0 2px 20px rgba(0,0,0,0.95), 0 0 24px rgba(0,0,0,0.9), 0 0 60px rgba(30,60,120,0.7);
-    }
 
     /* Rust: zachte hint in de anna-lijn zodat bezoeker weet dat ze
        Anna moeten aanspreken. Niet te druk — hoort bij slapende staat. */
@@ -317,7 +298,6 @@
     .s-spreekt   { color: #f4a060; }
     .s-afrekenen { color: #c89cf4; }
     .s-print     { color: #fdeecf; }
-    .s-knopmodus { color: #9cb6e8; }
     .s-offline   { color: #e07070; }
 
     /* Vonken: variërend per state */
@@ -335,8 +315,7 @@
       100% { transform: rotate(360deg) translateX(22vmin) rotate(-360deg); opacity: 1; }
     }
     body.state-rust .spark,
-    body.state-luistert .spark,
-    body.state-knopmodus .spark { animation-play-state: paused; opacity: 0.3; }
+    body.state-luistert .spark { animation-play-state: paused; opacity: 0.3; }
     body.state-denkt .spark {
       animation-name: orbit;
       animation-duration: 6s !important;
@@ -380,7 +359,7 @@
   </div>
 
 <script>
-  const STATES = ["rust", "luistert", "denkt", "spreekt", "afrekenen", "print", "knopmodus", "offline"];
+  const STATES = ["rust", "luistert", "denkt", "spreekt", "afrekenen", "print", "offline"];
 
   // --- vonken-SVG ---
   (function makeSparks() {
@@ -475,10 +454,6 @@
         v = "";
         a = PRINT_ICON;
         break;
-      case "knopmodus":
-        v = "";
-        a = "Druk op de knop om te praten.";
-        break;
       default:
         v = ""; a = "";
     }
@@ -492,8 +467,7 @@
     const ACTION_LABELS = {
       rust: "wacht", luistert: "neemt op…", denkt: "denkt…",
       spreekt: "spreekt…", afrekenen: "afrekenen…",
-      print: "print bon", knopmodus: "wacht op knop",
-      offline: "offline"
+      print: "print bon", offline: "offline"
     };
     document.getElementById("action").textContent = data.action || ACTION_LABELS[state] || "";
     document.getElementById("heard").textContent = data.heard || "";
