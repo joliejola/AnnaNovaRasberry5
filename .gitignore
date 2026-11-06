@@ -24,4 +24,4 @@ Thumbs.db
 
 # Bouwplan v2
 out/
-audio/*.wav
+audio/

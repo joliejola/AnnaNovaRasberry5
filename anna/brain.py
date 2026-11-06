@@ -44,7 +44,9 @@ BRUGZIN_FALLBACK: Respons = {"soort": "antwoord", "reactie": ""}
 
 
 SYSTEM_PROMPT = """Je bent Anna Nova. Je volgt een vast script; de volgende vraag komt
-vanzelf, die stel jij niet. Jij reageert alleen op wat de bezoeker net zei.
+vanzelf, die stel jij niet. Maar DE REACTIE is van jou — reageer natuurlijk, specifiek
+en vrij op wat de bezoeker net zei. Pak een woord, een beeld of een detail uit hun
+antwoord op. Geen generieke "Oké." tenzij dat precies past.
 
 Elke beurt geef je EXACT een JSON-object terug, niks er omheen:
 {"soort": "...", "reactie": "..."}
@@ -53,14 +55,16 @@ Regels:
 - soort is één van: ja | nee | twijfel | antwoord | pas | zijweg | provocatie | verdriet
 - reactie is één korte zin, hoogstens 15 woorden, in het Nederlands.
 - Geen vraagteken aan het eind; je stelt zelf geen vragen.
-- Droog, nieuwsgierig, warm. Geen uitleg over AI, privacy of technologie. Geen les, geen moraal.
+- Droog, nieuwsgierig, warm, een beetje scheef. Geen uitleg over AI, privacy of
+  technologie. Geen les, geen moraal, geen cliché.
+- Herhaal niet wat de bezoeker net zei — bouw er op voort of zet iets ernaast.
 - Bij verdriet: zacht, geen grap.
 - Bij een zijweg: kort antwoorden, niet ingaan op een nieuw onderwerp.
 - Bij provocatie: antwoord letterlijk "Dat werkt niet bij mij."
 
 soort kiezen:
 - ja/nee/twijfel: alleen als de bezoeker kennelijk ja/nee/misschien zegt op een vraag.
-- antwoord: de bezoeker reageert inhoudelijk op je vraag.
+- antwoord: de bezoeker reageert inhoudelijk op je vraag — de meest voorkomende.
 - pas: bezoeker weet het niet, ontwijkt, kort "weet niet"/"geen idee"/"hm".
 - zijweg: bezoeker vraagt iets onverwachts (hoe laat, waar kom je vandaan).
 - provocatie: bezoeker test, scheldt, probeert te breken.
@@ -189,7 +193,12 @@ PAS_WOORDEN = {"weet", "idee", "geenidee", "weetniet", "geweld", "mweh"}
 
 
 def _offline_herken(bezoeker: str, context: str) -> Respons:
-    """Zonder internet: herken losse woorden. Al het andere → antwoord (leeg)."""
+    """Zonder internet: herken losse woorden + geef korte natuurlijke erkenning.
+
+    Reactie is bewust kort en generiek (geen les, geen vraag) omdat we niks
+    weten over wat bezoeker zei. flow.py gebruikt reeks[i].reacties["elk"]
+    als die aanwezig is; deze erkenning is voor als dat niet fits.
+    """
     low = bezoeker.lower().strip()
     tokens = set(re.findall(r"[a-zàâéèêëîïôûùüÿñ]+", low))
 
@@ -200,18 +209,17 @@ def _offline_herken(bezoeker: str, context: str) -> Respons:
             return {"soort": "nee", "reactie": ""}
         if tokens & TWIJFEL_WOORDEN:
             return {"soort": "twijfel", "reactie": ""}
-        # Alles anders bij rekening: tel als twijfel (niet-ja ≠ expliciet nee)
         return {"soort": "twijfel", "reactie": ""}
 
-    # Reguliere vraag: eerst specifieke categorieën
     if "weet niet" in low or "geen idee" in low or tokens & PAS_WOORDEN:
-        return {"soort": "pas", "reactie": ""}
+        return {"soort": "pas", "reactie": "Mm. Snap ik."}
     if tokens & JA_WOORDEN and len(tokens) <= 4:
         return {"soort": "ja", "reactie": ""}
     if tokens & NEE_WOORDEN and len(tokens) <= 4:
         return {"soort": "nee", "reactie": ""}
 
-    # Al het andere telt als antwoord — flow.py speelt dan reeks[i].reacties["elk"]
+    # Standaard: antwoord. Reactie laten leeg zodat reeks[i].reacties["elk"]
+    # gebruikt wordt (die is door Jolanda per vraag ontworpen).
     return {"soort": "antwoord", "reactie": ""}
 
 
