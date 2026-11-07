@@ -175,7 +175,7 @@ def render_bon(
     LINE = FS_BODY + 8
     SMLINE = FS_SMALL + 6
     SEP_HEIGHT = 14
-    LOGO_H = 72 if logo_pad.exists() else 0
+    LOGO_H = 140 if logo_pad.exists() else 0
 
     hoogte = margin
     hoogte += LOGO_H + 8
