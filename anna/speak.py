@@ -140,31 +140,46 @@ def _say_elevenlabs_live(tekst: str, blocking: bool = True) -> bool:
         log.error("[speak] ElevenLabs HTTP %d: %s", r.status_code, r.text[:200])
         return False
 
+    # mpg123 decodeert MP3 → raw PCM naar stdout; aplay speelt dat af op
+    # dezelfde route als Piper. Op Debian 13 + USB-mic actief weigert
+    # mpg123 direct op het USB-speaker-device te schrijven (PipeWire-
+    # conflict); via aplay-pipe werkt het wel omdat aplay pipewire-alsa
+    # correct gebruikt.
+    aplay_bin = shutil.which("aplay") or "aplay"
     try:
-        proc = subprocess.Popen(
-            [mpg, "-q", "-"],
+        mpg_proc = subprocess.Popen(
+            [mpg, "-q", "-s", "-"],
             stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        aplay_proc = subprocess.Popen(
+            [aplay_bin, "-q", "-D", AUDIO_OUT, "-f", "S16_LE", "-r", "44100", "-c", "2"],
+            stdin=mpg_proc.stdout,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        mpg_proc.stdout.close()
     except Exception as e:
-        log.error("[speak] mpg123 start faalt: %s", e)
+        log.error("[speak] mpg123|aplay start faalt: %s", e)
         return False
 
     try:
         for chunk in r.iter_content(chunk_size=4096):
             if chunk:
-                proc.stdin.write(chunk)
-        proc.stdin.close()
+                mpg_proc.stdin.write(chunk)
+        mpg_proc.stdin.close()
         if blocking:
-            proc.wait(timeout=30)
+            aplay_proc.wait(timeout=30)
+            mpg_proc.wait(timeout=5)
         return True
     except Exception as e:
-        log.error("[speak] stream naar mpg123 faalt: %s", e)
-        try:
-            proc.kill()
-        except Exception:
-            pass
+        log.error("[speak] stream naar mpg123|aplay faalt: %s", e)
+        for pr in (mpg_proc, aplay_proc):
+            try:
+                pr.kill()
+            except Exception:
+                pass
         return False
 
 
