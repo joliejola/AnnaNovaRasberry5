@@ -455,7 +455,7 @@
   },
   "afsluiting": {
     "id": "rekening",
-    "tekst": "Dat was onze kennismaking. Dan nu de rekening. Wil je hem? Er staat niks van jou op.",
+    "tekst": "Dat was onze kennismaking. Dan nu de rekening. Wil je hem? Ik vergeet dit gesprek gelijk weer!",
     "takken": {
       "_uitleg": "Bij nee vraagt Anna of je het zeker weet. Elk ander antwoord: printen.",
       "nee": {
