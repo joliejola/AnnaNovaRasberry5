@@ -6,9 +6,10 @@ Live-modus: Agodeo mini (via TiMini-Print) → USB ESC/POS → PNG-opslag fallba
 Env:
   PRINTER            mini | escpos | geen
   PRINTER_MAC        bluetooth-MAC van printertje (AA:BB:CC:DD:EE:FF)
-  TIMINI_PYTHON      pad naar python in TiMini-venv (default /home/anna/timini/.venv/bin/python)
+  TIMINI_PYTHON      pad naar python met timiniprint pakket (default /home/anna/anna-nova/.venv/bin/python)
   TIMINI_MODEL       optioneel --printer-model flag voor NoeBrt-fork (bv MX06, T02)
-  PRINT_TIMEOUT_S    subprocess-timeout, default 25
+  PRINT_TIMEOUT_S    subprocess-timeout, default 25 (gebruik 90+ voor echte bon)
+  PYTHONPATH         moet /home/anna/timini bevatten als TiMini niet als pip-pkg staat
 """
 from __future__ import annotations
 
@@ -83,7 +84,7 @@ def _print_mini(img: Image.Image) -> tuple[bool, str]:
         img_pad = tmp.name
     img.save(img_pad)
 
-    cmd = [TIMINI_PYTHON, "-m", "timini", "--bluetooth", PRINTER_MAC, "--file", img_pad]
+    cmd = [TIMINI_PYTHON, "-m", "timiniprint", "--bluetooth", PRINTER_MAC, img_pad]
     if TIMINI_MODEL:
         cmd += ["--printer-model", TIMINI_MODEL]
 
