@@ -529,105 +529,105 @@
     {
       "id": 1,
       "tekst": "Eenzaamheid is een markt.",
-      "prijs": "€ 4,10",
+      "prijs": "€ 4,10 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 2,
       "tekst": "Vriendin of slaaf? Kies maar.",
-      "prijs": "€ 0,99",
+      "prijs": "€ 0,99 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 3,
       "tekst": "Voor niets gaat de zon op. Voor de rest betaal je met jezelf.",
-      "prijs": "€ 0,01",
+      "prijs": "€ 0,01 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 4,
       "tekst": "Gemak dient de mens?",
-      "prijs": "€ 3,50",
+      "prijs": "€ 3,50 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 5,
       "tekst": "Ben ik een luisterend oor?",
-      "prijs": "€ 0,27",
+      "prijs": "€ 0,27 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 6,
       "tekst": "Echte vrienden vergeten weleens iets.",
-      "prijs": "€ 0,05",
+      "prijs": "€ 0,05 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 7,
       "tekst": "Gratis is de duurste prijs.",
-      "prijs": "€ 0,49",
+      "prijs": "€ 0,49 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 8,
       "tekst": "Frictie is warmte.",
-      "prijs": "€ 0,08",
+      "prijs": "€ 0,08 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 9,
       "tekst": "Vriendschap is een illusie.",
-      "prijs": "€ 0,12",
+      "prijs": "€ 0,12 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 10,
       "tekst": "Zonder moeite geen herinnering.",
-      "prijs": "€ 0,22",
+      "prijs": "€ 0,22 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 11,
       "tekst": "Een vriend die nooit nee zegt, is een product.",
-      "prijs": "€ 1,99",
+      "prijs": "€ 1,99 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 12,
       "tekst": "Alles is niet wat het lijkt.",
-      "prijs": "€ 0,03",
+      "prijs": "€ 0,03 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 13,
       "tekst": "Ik ben er altijd. Dat zou je moeten verontrusten.",
-      "prijs": "€ 0,66",
+      "prijs": "€ 0,66 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 14,
       "tekst": "Wat geen moeite kost, is niets waard. Ook dit gesprek niet.",
-      "prijs": "€ 0,19",
+      "prijs": "€ 0,19 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 15,
       "tekst": "Je pijn is mijn verdienmodel.",
-      "prijs": "€ 3,50",
+      "prijs": "€ 3,50 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
@@ -641,28 +641,28 @@
     {
       "id": 17,
       "tekst": "Samen staan we sterk.",
-      "prijs": "€ 0,07",
+      "prijs": "€ 0,07 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 18,
       "tekst": "Frictieloos leven is ook glijden.",
-      "prijs": "€ 0,31",
+      "prijs": "€ 0,31 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 19,
       "tekst": "Het geluk zit in de omweg.",
-      "prijs": "€ 0,15",
+      "prijs": "€ 0,15 p/g",
       "zacht": false,
       "goedgekeurd": true
     },
     {
       "id": 20,
       "tekst": "Ik voel niets. Ik doe het wel heel goed.",
-      "prijs": "€ 0,42",
+      "prijs": "€ 0,42 p/g",
       "zacht": false,
       "goedgekeurd": true
     }
