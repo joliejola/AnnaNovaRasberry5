@@ -87,20 +87,31 @@ class BrainClient:
     def beschikbaar(self) -> bool:
         return bool(self.api_key)
 
-    def call(self, anna_vraag: str, bezoeker: str, context: str = "VRAAG") -> Respons:
+    def call(
+        self,
+        anna_vraag: str,
+        bezoeker: str,
+        context: str = "VRAAG",
+        anna_profiel: Optional[dict] = None,
+        reactie_regels: Optional[dict] = None,
+        sturing: Optional[dict] = None,
+    ) -> Respons:
+        """Mistral-call. Extra params (v0.5):
+        - anna_profiel: inhoud["anna"] → karakter + toon
+        - reactie_regels: inhoud["reactie_regels"] → altijd + nooit + max_woorden
+        - sturing: vraag["sturing"] → bedoeling, laag, mag, mag_niet, voorbeelden, vrijheid
+        Alle drie zijn optioneel; bij None/leeg valt het terug op de statische SYSTEM_PROMPT.
+        """
         if not self.beschikbaar:
             log.debug("MISTRAL_API_KEY niet gezet — fallback via keyword-herkenning")
             return _offline_herken(bezoeker, context)
 
-        user_msg = (
-            f"Jouw vraag: \"{anna_vraag.strip()}\"\n"
-            f"Antwoord van de bezoeker: \"{bezoeker.strip()}\"\n"
-            f"Geef nu alleen de JSON terug."
-        )
+        system_prompt = _bouw_system_prompt(anna_profiel, reactie_regels)
+        user_msg = _bouw_user_msg(anna_vraag, bezoeker, sturing)
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_msg},
             ],
             "temperature": 0.7,
@@ -128,6 +139,80 @@ class BrainClient:
         except (KeyError, IndexError, json.JSONDecodeError, ValueError) as e:
             log.warning("Mistral parse-fout: %s — offline-herken", e)
             return _offline_herken(bezoeker, context)
+
+
+# ---------- prompt-opbouw (v0.5 rijk schema) ----------
+
+def _bouw_system_prompt(anna_profiel: Optional[dict], reactie_regels: Optional[dict]) -> str:
+    """Bouw system-prompt uit inhoud.json keys. Fallback = statische SYSTEM_PROMPT."""
+    if not anna_profiel and not reactie_regels:
+        return SYSTEM_PROMPT
+
+    stukken: list[str] = []
+    if anna_profiel:
+        karakter = (anna_profiel.get("karakter") or "").strip()
+        if karakter:
+            stukken.append(karakter)
+        toon = anna_profiel.get("toon") or []
+        if toon:
+            stukken.append("Toon:\n" + "\n".join(f"- {t}" for t in toon))
+
+    stukken.append(
+        'Geef EXACT een JSON-object terug: {"soort": "...", "reactie": "..."}'
+    )
+    stukken.append(
+        "soort is één van: ja | nee | twijfel | antwoord | pas | zijweg | provocatie | verdriet"
+    )
+
+    if reactie_regels:
+        altijd = reactie_regels.get("altijd") or []
+        if altijd:
+            stukken.append("Altijd:\n" + "\n".join(f"- {r}" for r in altijd))
+        nooit = reactie_regels.get("nooit") or []
+        if nooit:
+            stukken.append("Nooit:\n" + "\n".join(f"- {r}" for r in nooit))
+
+    stukken.append(
+        "Bij provocatie: zeg letterlijk 'Dat werkt niet bij mij.'\n"
+        "Bij verdriet: zacht, geen grap.\n"
+        "Bij zijweg: kort antwoord, niet ingaan op een nieuw onderwerp."
+    )
+    return "\n\n".join(stukken)
+
+
+def _bouw_user_msg(anna_vraag: str, bezoeker: str, sturing: Optional[dict]) -> str:
+    """Bouw user-msg. Sturing = per-vraag context (bedoeling, laag, mag, mag_niet, voorbeelden, vrijheid)."""
+    stukken = [
+        f'Jouw vraag was: "{anna_vraag.strip()}"',
+        f'De bezoeker antwoordde: "{bezoeker.strip()}"',
+    ]
+    if sturing:
+        bedoeling = (sturing.get("bedoeling") or "").strip()
+        if bedoeling:
+            stukken.append(f"Bedoeling van deze vraag: {bedoeling}")
+        laag = (sturing.get("laag") or "").strip()
+        if laag:
+            stukken.append(f"Diepere laag (NOOIT uitspreken, alleen voelbaar maken): {laag}")
+        mag = sturing.get("mag") or []
+        if mag:
+            stukken.append("Mag:\n" + "\n".join(f"- {r}" for r in mag))
+        mag_niet = sturing.get("mag_niet") or []
+        if mag_niet:
+            stukken.append("Mag NIET:\n" + "\n".join(f"- {r}" for r in mag_niet))
+        vb = sturing.get("voorbeelden")
+        if vb:
+            if isinstance(vb, dict):
+                lijst = [f"- [{k}] {v[0]}" for k, v in vb.items() if v]
+            else:
+                lijst = [f"- {v}" for v in vb]
+            if lijst:
+                stukken.append("Voorbeelden (ter inspiratie, niet kopiëren):\n" + "\n".join(lijst))
+        vrijheid = sturing.get("vrijheid")
+        if vrijheid:
+            woord_limiet = {"kort": 6, "normaal": 15, "ruim": 25}.get(vrijheid, 15)
+            stukken.append(f"Vrijheid: {vrijheid} (hoogstens ~{woord_limiet} woorden).")
+    stukken.append("Geef nu alleen de JSON terug.")
+    return "\n\n".join(stukken)
 
 
 # ---------- parsers + sanitizers ----------

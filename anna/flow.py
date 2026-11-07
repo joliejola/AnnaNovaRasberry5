@@ -54,6 +54,7 @@ class State(str, Enum):
     RUIS = "RUIS"
     ZACHT = "ZACHT"
     AFSLUITING = "AFSLUITING"
+    ZEKER = "ZEKER"
     BON = "BON"
     LOSLATEN = "LOSLATEN"
 
@@ -143,7 +144,11 @@ class Flow:
         # sleep/debug/spraak in RUST: negeren, blijf
 
     def handle_opening(self) -> None:
-        self._speel(self._rand_item(self.inhoud["openingen"]))
+        # Nieuw schema v0.5: v0 is zelf de opening-vraag.
+        # Oude schema (openingen[]-lijst) wordt genegeerd als 'openingen' niet bestaat.
+        openings = self.inhoud.get("openingen")
+        if openings:
+            self._speel(self._rand_item(openings))
         self._switch(State.VRAAG)
 
     def handle_vraag(self) -> None:
@@ -154,6 +159,10 @@ class Flow:
         v = self._vraag()
         self.sessie.stil_count_op_vraag = 0
         self.sessie.ruis_count_op_vraag = 0
+        # v0.5: aanloop vóór de vraag-tekst (indien niet leeg)
+        aanloop = v.get("aanloop")
+        if isinstance(aanloop, dict) and (aanloop.get("tekst") or "").strip():
+            self._speel(aanloop)
         self._speel(v)
         self._switch(State.LUISTEREN)
 
@@ -198,7 +207,13 @@ class Flow:
         if self.brain_client.beschikbaar:
             self._speel(self._rand_item(self.inhoud["wachtzinnen"]))
 
-        r = self.brain_client.call(v["tekst"], bezoeker, context="VRAAG")
+        # v0.5: geef anna-profiel + reactie_regels + per-vraag sturing mee
+        r = self.brain_client.call(
+            v["tekst"], bezoeker, context="VRAAG",
+            anna_profiel=self.inhoud.get("anna"),
+            reactie_regels=self.inhoud.get("reactie_regels"),
+            sturing=v.get("sturing"),
+        )
         self.sessie.laatste_soort = r["soort"]
 
         # Verdriet → ZACHT
@@ -234,26 +249,27 @@ class Flow:
             self._switch(State.VRAAG)
 
     def _speel_reactie(self, respons: dict, vraag: dict) -> None:
-        """Speel brain-reactie, met fallback naar voorbeeldreactie uit reeks."""
+        """Speel brain-reactie, met fallback naar reserve uit vraag.
+
+        v0.5 schema: vraag["reserve"][soort|"elk"].
+        Fallback naar vraag["reacties"][...] voor backward compat.
+        Na brain-reactie: speel vraag["na_reactie"] als die bestaat.
+        """
         reactie_tekst = (respons.get("reactie") or "").strip()
-        reacties = vraag.get("reacties", {})
+        reserve = vraag.get("reserve") or vraag.get("reacties") or {}
         soort = respons["soort"]
+        voorbeeld = reserve.get(soort) or reserve.get("elk")
 
-        # Voorbeeldreactie uit reeks heeft prioriteit voor ja/nee/twijfel
-        # (die zitten alleen in vraag 1 meestal)
-        voorbeeld = reacties.get(soort) or reacties.get("elk")
-
-        # Brain-reactie is leeg of ongeldig → voorbeeld
-        if not reactie_tekst and voorbeeld:
+        if reactie_tekst:
+            speak.say(reactie_tekst)
+        elif voorbeeld:
             self._speel(voorbeeld)
-            return
 
-        # Beide leeg → niks zeggen (brain zei niks nuttigs, geen voorbeeld)
-        if not reactie_tekst:
-            return
-
-        # Live brain-reactie uitspreken (al gesanitized)
-        speak.say(reactie_tekst)
+        # na_reactie: vaste zin die Anna altijd direct na de vrije reactie zegt
+        # (v0.5 heeft dit bij v2 — "Thuis kijkt er niemand mee. Denk je…")
+        na_reactie = vraag.get("na_reactie")
+        if isinstance(na_reactie, dict) and (na_reactie.get("tekst") or "").strip():
+            self._speel(na_reactie)
 
     def handle_stil(self) -> None:
         assert self.sessie
@@ -295,23 +311,46 @@ class Flow:
             self._switch(State.LOSLATEN)
             return
         if ev.type == "stilte":
-            # Geen antwoord op rekening → geen bon
-            self._speel(self.inhoud["na_nee"])
-            self._switch(State.LOSLATEN)
+            # v0.5: stilte op rekening → bon (zie afsluiting.takken.stilte = bon)
+            self._switch(State.BON)
             return
 
-        # Beslis ja/nee/twijfel via brain (offline-fallback werkt ook)
+        # Beslis ja/nee/twijfel via brain
         r = self.brain_client.call(
             self.inhoud["afsluiting"]["tekst"],
             ev.tekst or "",
             context="AFSLUITING",
         )
-        if r["soort"] == "ja":
-            self._switch(State.BON)
+        # v0.5 takken: nee → zeker, rest (ja/twijfel/antwoord/pas/stilte/zijweg) → bon
+        if r["soort"] == "nee":
+            self._switch(State.ZEKER)
         else:
-            # nee of twijfel → geen bon
-            self._speel(self.inhoud["na_nee"])
+            self._switch(State.BON)
+
+    def handle_zeker(self) -> None:
+        assert self.sessie
+        zeker = self.inhoud.get("zeker")
+        if not zeker:
+            # Backward compat: oude schema zonder zeker-state → na_nee + LOSLATEN
+            self._speel(self.inhoud.get("na_nee"))
             self._switch(State.LOSLATEN)
+            return
+        self._speel(zeker)
+        ev = hear.luister_spraak(prompt="[ZEKER] ")
+        if ev.type in ("sleep", "weg"):
+            self._switch(State.LOSLATEN)
+            return
+        if ev.type == "stilte":
+            # stilte bij "weet je het zeker?" → toch printen (takken.stilte=bon)
+            self._switch(State.BON)
+            return
+        r = self.brain_client.call(zeker["tekst"], ev.tekst or "", context="AFSLUITING")
+        # takken: ja → einde+na_nee, rest → bon
+        if r["soort"] == "ja":
+            self._speel(self.inhoud.get("na_nee"))
+            self._switch(State.LOSLATEN)
+        else:
+            self._switch(State.BON)
 
     def handle_bon(self) -> None:
         assert self.sessie
