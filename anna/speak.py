@@ -148,7 +148,9 @@ def _say_elevenlabs_live(tekst: str, blocking: bool = True) -> bool:
     aplay_bin = shutil.which("aplay") or "aplay"
     try:
         mpg_proc = subprocess.Popen(
-            [mpg, "-q", "-s", "-"],
+            # --rate/--stereo forceren: anders streamt mpg123 op source-SR en
+            # vervormt aplay bij -r 44100 (klinkt snel/raar).
+            [mpg, "-q", "--rate", "44100", "--stereo", "-s", "-"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
