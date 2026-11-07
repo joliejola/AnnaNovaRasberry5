@@ -178,7 +178,6 @@ def render_bon(
 
     hoogte = margin
     hoogte += LOGO_H + 8
-    hoogte += FS_CAPTION + 6
     hoogte += SEP_HEIGHT
     if quote_regels:
         hoogte += len(quote_regels) * LINE + 4
@@ -212,9 +211,6 @@ def render_bon(
         except Exception:
             pass
     y += LOGO_H + 8
-
-    _tekst_centraal(dr, "AI VRIENDIN GEZOCHT", y, breedte_px, font_caption_b)
-    y += FS_CAPTION + 6
 
     _horizontale_lijn(dr, y, breedte_px, margin)
     y += SEP_HEIGHT
