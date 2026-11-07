@@ -271,11 +271,15 @@ class Flow:
         elif voorbeeld:
             self._speel(voorbeeld)
 
-        # na_reactie: vaste zin die Anna altijd direct na de vrije reactie zegt
-        # (v0.5 heeft dit bij v2 — "Thuis kijkt er niemand mee. Denk je…")
+        # na_reactie: zin die Anna soms na de vrije reactie zegt.
+        # Als "kans" is gezet (0..1), speelt hij alleen met die kans af —
+        # zo dringt een stillete overweging zoals "Thuis kijkt er niemand
+        # mee... denk je?" zich niet op bij iedere bezoeker.
         na_reactie = vraag.get("na_reactie")
         if isinstance(na_reactie, dict) and (na_reactie.get("tekst") or "").strip():
-            self._speel(na_reactie)
+            kans = na_reactie.get("kans")
+            if kans is None or random.random() < float(kans):
+                self._speel(na_reactie)
 
     def handle_stil(self) -> None:
         assert self.sessie
