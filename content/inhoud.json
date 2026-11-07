@@ -392,15 +392,23 @@
   "wachtzinnen": [
     {
       "id": "wacht1",
-      "tekst": "Ik denk na. Je telefoon had nu al geantwoord."
+      "tekst": "Hmm."
     },
     {
       "id": "wacht2",
-      "tekst": "Even geduld. Dit is handwerk."
+      "tekst": "Mm."
     },
     {
       "id": "wacht3",
-      "tekst": "Wacht. Ik ben niet geoptimaliseerd."
+      "tekst": "Tja."
+    },
+    {
+      "id": "wacht4",
+      "tekst": "Even denken."
+    },
+    {
+      "id": "wacht5",
+      "tekst": "Oh."
     }
   ],
   "situaties": {

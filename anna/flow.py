@@ -203,9 +203,15 @@ class Flow:
         v = self._vraag()
         bezoeker = self.sessie.laatste_antwoord
 
-        # wachtzin voor traag-voelen-vermijden
+        # wachtzin af en toe — niet elke beurt (irriteert). ~30% kans,
+        # en nooit twee beurten op rij in dezelfde sessie.
         if self.brain_client.beschikbaar:
-            self._speel(self._rand_item(self.inhoud["wachtzinnen"]))
+            vorige = getattr(self.sessie, "_vorige_wachtzin", False)
+            if not vorige and random.random() < 0.3:
+                self._speel(self._rand_item(self.inhoud["wachtzinnen"]))
+                self.sessie._vorige_wachtzin = True
+            else:
+                self.sessie._vorige_wachtzin = False
 
         # v0.5: geef anna-profiel + reactie_regels + per-vraag sturing mee
         r = self.brain_client.call(
