@@ -152,14 +152,15 @@ def render_bon(
     logo_pad: Path = LOGO_PATH,
 ) -> Image.Image:
     """Bouw PIL.Image van de bon volgens bron-2 lay-out (zonder 'Jouw aandeel')."""
-    FS_CAPTION = 16
-    FS_BODY = 18
-    FS_SMALL = 14
+    FS_CAPTION = 22
+    FS_BODY = 26
+    FS_SMALL = 20
 
-    font_body = _load_font(FS_BODY)
+    # Alles vet voor maximale leesbaarheid op thermische print.
+    font_body = _load_font(FS_BODY, bold=True)
     font_body_b = _load_font(FS_BODY, bold=True)
     font_caption_b = _load_font(FS_CAPTION, bold=True)
-    font_small = _load_font(FS_SMALL)
+    font_small = _load_font(FS_SMALL, bold=True)
 
     margin = 12
     werk_breedte = breedte_px - 2 * margin
@@ -171,9 +172,9 @@ def render_bon(
 
     quote_regels = _wrap(quote_tekst, font_body, werk_breedte)
 
-    LINE = FS_BODY + 6
-    SMLINE = FS_SMALL + 4
-    SEP_HEIGHT = 10
+    LINE = FS_BODY + 8
+    SMLINE = FS_SMALL + 6
+    SEP_HEIGHT = 14
     LOGO_H = 72 if logo_pad.exists() else 0
 
     hoogte = margin
@@ -269,7 +270,7 @@ def _tekst_rechts(dr, tekst, y, x_rechts, font):
 
 
 def _horizontale_lijn(dr, y, totale_breedte, margin):
-    dr.line([(margin, y + 3), (totale_breedte - margin, y + 3)], fill=0, width=1)
+    dr.line([(margin, y + 3), (totale_breedte - margin, y + 3)], fill=0, width=3)
 
 
 # ---------- publieke API voor flow.py ----------
