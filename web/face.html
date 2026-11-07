@@ -17,24 +17,25 @@
 
     .stage {
       position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
+      display: block;
     }
     .square {
-      position: relative;
-      width: 100vmin; height: 100vmin;
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
       overflow: hidden;
       background: #000;
     }
 
-    /* Achtergrond-canvas: statische backdrop + optioneel stippen uit see.py.
-       Tot camera werkt: backdrop.webp als sfeer-beeld. */
+    /* Achtergrond-canvas: statische backdrop schermvullend + optioneel stippen
+       uit see.py. Tot camera werkt: backdrop.webp vult het hele scherm (cover,
+       geen zwarte banden). */
     #achtergrond {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
       z-index: 0;
       background: #0a0205 url('/backdrop.webp') center/cover no-repeat;
-      filter: blur(2px) brightness(0.75) saturate(1.05);
-      transform: scale(1.04);
+      background-size: cover;
+      filter: brightness(0.9) saturate(1.05);
     }
 
     /* --- Vignette: kleur per state. Center openen in actieve toestanden. --- */
