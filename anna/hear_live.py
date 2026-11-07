@@ -139,7 +139,30 @@ class WakeListener:
         except Exception:
             pass
 
-        rec = KaldiRecognizer(model, SAMPLE_RATE)
+        import json as _json
+        # Beperkt vocabulair = veel accurater herkennen van wake-phrase.
+        # Vosk NL-small is zonder grammar te zwak voor "hoi anna nova" (hoort
+        # het bv als "op zoek te gaan maken samen"). Met deze grammar mag Vosk
+        # alleen wake-woorden herkennen; alles anders → leeg partial.
+        _wake_grammar = _json.dumps([
+            "hoi anna nova",
+            "hoi anna",
+            "hallo anna nova",
+            "hallo anna",
+            "hey anna nova",
+            "hey anna",
+            "anna nova",
+            "ohana nova",
+            "ohana",
+            "anna",
+            "hoi",
+            "hallo",
+            "hey",
+            "word wakker anna",
+            "wakker",
+            "[unk]",
+        ])
+        rec = KaldiRecognizer(model, SAMPLE_RATE, _wake_grammar)
         rec.SetWords(False)
 
         q: queue.Queue = queue.Queue()
